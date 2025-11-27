@@ -70,8 +70,16 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text placeholder:dark:text-dark-text-tertiary placeholder:light:text-light-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue/50 transition-all"
+                autoComplete="email"
+                data-theme={theme}
+                className={`w-full px-4 py-3 border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text placeholder:dark:text-dark-text-tertiary placeholder:light:text-light-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue/50 transition-all ${theme === 'dark' ? 'email-dark-bg' : 'email-light-bg'}`}
                 placeholder="you@example.com"
+                style={{
+                  backgroundColor: theme === 'dark' ? '#252550' : '#f8faff',
+                  color: theme === 'dark' ? '#ffffff' : '#1e293b',
+                  WebkitTextFillColor: theme === 'dark' ? '#ffffff' : '#1e293b',
+                  borderColor: theme === 'dark' ? '#3a3a6a' : '#e0e7ff'
+                }}
               />
             </div>
 
@@ -85,8 +93,14 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
                 className="w-full px-4 py-3 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text placeholder:dark:text-dark-text-tertiary placeholder:light:text-light-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue/50 transition-all"
                 placeholder="••••••••"
+                style={{
+                  ...(theme === 'dark' && { backgroundColor: '#1F2937' }),
+                  color: 'inherit',
+                  WebkitTextFillColor: 'inherit'
+                }}
               />
             </div>
 

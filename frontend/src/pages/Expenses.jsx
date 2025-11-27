@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import api from '../utils/api'
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { FaEdit, FaTrash, FaPlus } from 'react-icons/fa'
+import { AnimatedCard } from '../components/ui/AnimatedCard'
+import { AnimatedButton } from '../components/ui/AnimatedButton'
+import { AnimatedModal } from '../components/ui/AnimatedModal'
+import { ScrollReveal } from '../components/ui/ScrollReveal'
+import { SkeletonLoader } from '../components/ui/SkeletonLoader'
 
 export default function Expenses() {
   const { user } = useAuth()
@@ -109,8 +115,14 @@ export default function Expenses() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="dark:text-dark-text-secondary light:text-light-text-secondary">Loading...</div>
+      <div className="space-y-4 sm:space-y-6">
+        <div>
+          <div className="h-8 sm:h-10 bg-gradient-to-r from-transparent via-dark-border to-transparent dark:via-dark-border light:via-light-border rounded w-48 mb-2 animate-pulse"></div>
+          <div className="h-4 sm:h-5 bg-gradient-to-r from-transparent via-dark-border to-transparent dark:via-dark-border light:via-light-border rounded w-64 animate-pulse"></div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <SkeletonLoader count={3} />
+        </div>
       </div>
     )
   }
@@ -122,90 +134,106 @@ export default function Expenses() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-4xl font-bold dark:text-dark-text light:text-light-text mb-2">Expenses</h1>
-          <p className="dark:text-dark-text-secondary light:text-light-text-secondary">Track shared expenses</p>
+    <div className="space-y-4 sm:space-y-6">
+      <ScrollReveal>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold dark:text-dark-text light:text-light-text mb-1 sm:mb-2">Expenses</h1>
+            <p className="text-sm sm:text-base dark:text-dark-text-secondary light:text-light-text-secondary">Track shared expenses</p>
+          </div>
+          {canEdit && (
+            <AnimatedButton
+              onClick={() => {
+                setEditingExpense(null)
+                setFormData({ amount: '', description: '' })
+                setShowAddForm(!showAddForm)
+              }}
+              variant="success"
+              className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base flex items-center justify-center gap-2"
+            >
+              <FaPlus /> {showAddForm ? 'Cancel' : 'Add Expense'}
+            </AnimatedButton>
+          )}
         </div>
-        {canEdit && (
-          <button
-            onClick={() => {
-              setEditingExpense(null)
-              setFormData({ amount: '', description: '' })
-              setShowAddForm(!showAddForm)
-            }}
-            className="px-6 py-3 bg-gradient-to-r from-accent-emerald via-accent-teal to-accent-cyan text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-accent-emerald/30 hover:scale-105 transition-all flex items-center gap-2"
-          >
-            <FaPlus /> {showAddForm ? 'Cancel' : 'Add Expense'}
-          </button>
-        )}
-      </div>
+      </ScrollReveal>
 
-      {showAddForm && canEdit && (
-        <div className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-2xl p-6 shadow-soft">
-          <h2 className="text-2xl font-bold dark:text-dark-text light:text-light-text mb-6">
-            {editingExpense ? 'Edit Expense' : 'Add New Expense'} - {loggedInPersonFormatted}
-          </h2>
-          <form onSubmit={handleSubmit} className="space-y-5">
+      <AnimatePresence>
+        {showAddForm && canEdit && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft"
+          >
+            <h2 className="text-lg sm:text-xl lg:text-2xl font-bold dark:text-dark-text light:text-light-text mb-4 sm:mb-6">
+              {editingExpense ? 'Edit Expense' : 'Add New Expense'} - {loggedInPersonFormatted}
+            </h2>
+            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
             <div>
-              <label className="block text-sm font-medium dark:text-dark-text-secondary light:text-light-text-secondary mb-2">
+              <label className="block text-xs sm:text-sm font-medium dark:text-dark-text-secondary light:text-light-text-secondary mb-2">
                 Amount (₹)
               </label>
-              <input
+              <motion.input
                 type="number"
                 step="0.01"
                 min="0"
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 required
-                className="w-full px-4 py-3 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all"
+                whileFocus={{ scale: 1.01, boxShadow: "0 0 0 3px rgba(94, 58, 255, 0.2)" }}
+                className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all"
                 placeholder="Enter amount"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium dark:text-dark-text-secondary light:text-light-text-secondary mb-2">
+              <label className="block text-xs sm:text-sm font-medium dark:text-dark-text-secondary light:text-light-text-secondary mb-2">
                 Description
               </label>
-              <input
+              <motion.input
                 type="text"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-4 py-3 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all"
+                whileFocus={{ scale: 1.01, boxShadow: "0 0 0 3px rgba(94, 58, 255, 0.2)" }}
+                className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all"
                 placeholder="Enter description (optional)"
               />
             </div>
-            <div className="flex gap-3">
-              <button
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+              <AnimatedButton
                 type="submit"
-                className="px-6 py-3 bg-gradient-to-r from-accent-lime via-accent-emerald to-accent-teal text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-accent-lime/30 hover:scale-105 transition-all"
+                variant="success"
+                className="flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base"
               >
                 {editingExpense ? 'Update Expense' : 'Add Expense'}
-              </button>
-              <button
+              </AnimatedButton>
+              <AnimatedButton
                 type="button"
                 onClick={handleCancel}
-                className="px-6 py-3 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border dark:text-dark-text light:text-light-text font-semibold rounded-xl hover:opacity-90 transition-opacity"
+                variant="secondary"
+                className="flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base"
               >
                 Cancel
-              </button>
+              </AnimatedButton>
             </div>
           </form>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Three Person Boxes */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {persons.map((person, index) => {
+      <ScrollReveal>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {persons.map((person, index) => {
           const personExpenses = getExpensesForPerson(person)
           const personTotal = getTotalForPerson(person)
           const isLoggedInPerson = person.toLowerCase() === loggedInPerson.toLowerCase()
           
           // Assign different vibrant colors to each person
           const colorClasses = [
-            'bg-gradient-to-br from-accent-indigo/40 via-accent-violet/40 to-accent-fuchsia/40 dark:from-accent-indigo/50 dark:via-accent-violet/50 dark:to-accent-fuchsia/50 border-4 border-accent-indigo/60',
-            'bg-gradient-to-br from-accent-emerald/40 via-accent-teal/40 to-accent-cyan/40 dark:from-accent-emerald/50 dark:via-accent-teal/50 dark:to-accent-cyan/50 border-4 border-accent-emerald/60',
-            'bg-gradient-to-br from-accent-rose/40 via-accent-pink/40 to-accent-fuchsia/40 dark:from-accent-rose/50 dark:via-accent-pink/50 dark:to-accent-fuchsia/50 border-4 border-accent-rose/60',
+            'bg-gradient-to-br from-accent-indigo/40 via-accent-violet/40 to-accent-fuchsia/40 dark:from-accent-indigo/50 dark:via-accent-violet/50 dark:to-accent-fuchsia/50 border-2 sm:border-4 border-accent-indigo/60',
+            'bg-gradient-to-br from-accent-emerald/40 via-accent-teal/40 to-accent-cyan/40 dark:from-accent-emerald/50 dark:via-accent-teal/50 dark:to-accent-cyan/50 border-2 sm:border-4 border-accent-emerald/60',
+            'bg-gradient-to-br from-accent-rose/40 via-accent-pink/40 to-accent-fuchsia/40 dark:from-accent-rose/50 dark:via-accent-pink/50 dark:to-accent-fuchsia/50 border-2 sm:border-4 border-accent-rose/60',
           ]
           const textGradients = [
             'from-accent-indigo via-accent-violet to-accent-fuchsia',
@@ -214,53 +242,59 @@ export default function Expenses() {
           ]
 
           return (
-            <div
+            <motion.div
               key={person}
-              className={`${colorClasses[index]} dark:bg-gradient-to-br light:bg-gradient-to-br rounded-2xl p-6 shadow-2xl hover:shadow-3xl hover:scale-105 transition-all duration-300 ${
-                isLoggedInPerson ? 'ring-4 ring-accent-yellow/50 shadow-accent-yellow/30' : ''
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.1 }}
+              whileHover={{ scale: 1.02, boxShadow: "0 12px 24px rgba(0, 0, 0, 0.2)" }}
+              className={`${colorClasses[index]} dark:bg-gradient-to-br light:bg-gradient-to-br rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 ${
+                isLoggedInPerson ? 'ring-2 sm:ring-4 ring-accent-yellow/50 shadow-accent-yellow/30' : ''
               }`}
             >
-              <div className="flex items-center justify-between mb-4">
-                <h2 className={`text-3xl font-extrabold bg-gradient-to-r ${textGradients[index]} bg-clip-text text-transparent`}>{person}</h2>
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h2 className={`text-xl sm:text-2xl lg:text-3xl font-extrabold bg-gradient-to-r ${textGradients[index]} bg-clip-text text-transparent`}>{person}</h2>
                 {isLoggedInPerson && (
-                  <span className="text-xs px-3 py-1.5 bg-gradient-to-r from-accent-yellow via-accent-amber to-accent-orange text-white rounded-full font-extrabold shadow-lg">
+                  <span className="text-xs px-2 sm:px-3 py-1 sm:py-1.5 bg-gradient-to-r from-accent-yellow via-accent-amber to-accent-orange text-white rounded-full font-extrabold shadow-lg">
                     You
                   </span>
                 )}
               </div>
               
-              <div className="mb-4 pb-4 border-b-2 dark:border-dark-border light:border-light-border">
-                <p className="text-sm font-bold dark:text-dark-text-secondary light:text-light-text-secondary mb-1">Total</p>
-                <p className={`text-4xl font-extrabold bg-gradient-to-r ${textGradients[index]} bg-clip-text text-transparent`}>₹{personTotal.toFixed(2)}</p>
+              <div className="mb-3 sm:mb-4 pb-3 sm:pb-4 border-b-2 dark:border-dark-border light:border-light-border">
+                <p className="text-xs sm:text-sm font-bold dark:text-dark-text-secondary light:text-light-text-secondary mb-1">Total</p>
+                <p className={`text-2xl sm:text-3xl lg:text-4xl font-extrabold bg-gradient-to-r ${textGradients[index]} bg-clip-text text-transparent`}>₹{personTotal.toFixed(2)}</p>
               </div>
 
               {personExpenses.length === 0 ? (
-                <p className="dark:text-dark-text-secondary light:text-light-text-secondary text-center py-8 text-sm font-semibold">
+                <p className="dark:text-dark-text-secondary light:text-light-text-secondary text-center py-6 sm:py-8 text-xs sm:text-sm font-semibold">
                   No expenses yet
                 </p>
               ) : (
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {personExpenses.map((expense) => (
-                    <div
-                      key={expense.id}
-                      className={`p-4 dark:bg-gradient-to-r dark:from-dark-card dark:to-dark-surface light:bg-gradient-to-r light:from-light-card light:to-light-surface border-2 ${
-                        index === 0 ? 'border-accent-indigo/40 dark:border-accent-indigo/50' :
-                        index === 1 ? 'border-accent-emerald/40 dark:border-accent-emerald/50' :
-                        'border-accent-rose/40 dark:border-accent-rose/50'
-                      } rounded-xl shadow-md hover:shadow-xl transition-all`}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className={`text-sm font-extrabold bg-gradient-to-r ${textGradients[index]} bg-clip-text text-transparent`}>
+                <div className="space-y-2 sm:space-y-3 max-h-96 overflow-y-auto">
+                  <AnimatePresence>
+                    {personExpenses.map((expense, expenseIdx) => (
+                      <AnimatedCard
+                        key={expense.id}
+                        delay={expenseIdx * 0.03}
+                        className={`p-3 sm:p-4 border-2 ${
+                          index === 0 ? 'border-accent-indigo/40 dark:border-accent-indigo/50' :
+                          index === 1 ? 'border-accent-emerald/40 dark:border-accent-emerald/50' :
+                          'border-accent-rose/40 dark:border-accent-rose/50'
+                        }`}
+                      >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
+                            <p className={`text-xs sm:text-sm font-extrabold bg-gradient-to-r ${textGradients[index]} bg-clip-text text-transparent`}>
                               {expense.person}
                             </p>
-                            <p className={`text-xl font-extrabold bg-gradient-to-r ${textGradients[index]} bg-clip-text text-transparent`}>
+                            <p className={`text-lg sm:text-xl font-extrabold bg-gradient-to-r ${textGradients[index]} bg-clip-text text-transparent`}>
                               ₹{expense.amount.toFixed(2)}
                             </p>
                           </div>
                           {expense.description && (
-                            <p className="text-sm font-semibold dark:text-dark-text-secondary light:text-light-text-secondary mt-1">
+                            <p className="text-xs sm:text-sm font-semibold dark:text-dark-text-secondary light:text-light-text-secondary mt-1 break-words">
                               {expense.description}
                             </p>
                           )}
@@ -269,40 +303,48 @@ export default function Expenses() {
                           </p>
                         </div>
                         {isLoggedInPerson && (
-                          <div className="flex gap-2 ml-2">
-                            <button
+                          <div className="flex gap-1 sm:gap-2 ml-2 flex-shrink-0">
+                            <motion.button
                               onClick={() => handleEdit(expense)}
-                              className="p-2.5 bg-gradient-to-br from-accent-sky to-accent-cyan text-white rounded-lg hover:shadow-lg hover:shadow-accent-sky/30 hover:scale-110 transition-all"
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="p-2 sm:p-2.5 bg-gradient-to-br from-accent-sky to-accent-cyan text-white rounded-lg shadow-lg shadow-accent-sky/30 transition-all"
                               title="Edit expense"
                             >
-                              <FaEdit className="w-4 h-4" />
-                            </button>
-                            <button
+                              <FaEdit className="w-3 h-3 sm:w-4 sm:h-4" />
+                            </motion.button>
+                            <motion.button
                               onClick={() => handleDelete(expense.id, expense.person)}
-                              className="p-2.5 bg-gradient-to-br from-accent-red to-accent-rose text-white rounded-lg hover:shadow-lg hover:shadow-accent-red/30 hover:scale-110 transition-all"
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="p-2 sm:p-2.5 bg-gradient-to-br from-accent-red to-accent-rose text-white rounded-lg shadow-lg shadow-accent-red/30 transition-all"
                               title="Delete expense"
                             >
-                              <FaTrash className="w-4 h-4" />
-                            </button>
+                              <FaTrash className="w-3 h-3 sm:w-4 sm:h-4" />
+                            </motion.button>
                           </div>
                         )}
                       </div>
-                    </div>
-                  ))}
+                      </AnimatedCard>
+                    ))}
+                  </AnimatePresence>
                 </div>
               )}
-            </div>
+            </motion.div>
           )
         })}
-      </div>
+        </div>
+      </ScrollReveal>
 
       {/* Overall Total */}
-      <div className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-2xl p-6 shadow-soft">
+      <ScrollReveal>
+        <AnimatedCard className="p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold dark:text-dark-text light:text-light-text">Grand Total</h2>
           <p className="text-3xl font-bold dark:text-dark-text light:text-light-text">₹{totalExpenses.toFixed(2)}</p>
         </div>
-      </div>
+        </AnimatedCard>
+      </ScrollReveal>
     </div>
   )
 }

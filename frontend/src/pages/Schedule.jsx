@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from '../utils/api'
 import { format, startOfYear, endOfYear, eachDayOfInterval, getYear, differenceInDays, startOfDay } from 'date-fns'
 import { FaSync, FaLightbulb, FaEdit, FaCalendarDay } from 'react-icons/fa'
+import NoteFloatingWidget from '../components/NoteFloatingWidget'
 
 export default function Schedule() {
+  const navigate = useNavigate()
   const [schedule, setSchedule] = useState(null)
   const [settings, setSettings] = useState(null)
+  const [dayNotes, setDayNotes] = useState({}) // Map of date strings to notes
   const currentYear = getYear(new Date())
   const todayDate = format(new Date(), 'yyyy-MM-dd')
   const [selectedYear, setSelectedYear] = useState(currentYear)
@@ -35,10 +39,11 @@ export default function Schedule() {
     fetchSettings()
     loadSavedSchedule()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [selectedYear])
 
   useEffect(() => {
     setCurrentStartIndex(0)
+    setDayNotes({}) // Clear notes when year changes
     // If selected year is current year, default to today, otherwise start from beginning
     if (selectedYear === currentYear) {
       setSelectedStartDate(todayDate)
@@ -85,6 +90,7 @@ export default function Schedule() {
       })
       setSchedule(response.data)
       setCurrentStartIndex(0) // Reset to first page
+      setDayNotes({}) // Clear notes when schedule is regenerated
     } catch (error) {
       console.error('Error generating schedule:', error)
       const errorMessage = error.response?.data?.detail || error.message || 'Failed to generate schedule. Please try again.'
@@ -131,19 +137,92 @@ export default function Schedule() {
     }
   }
 
-  const handlePrevious = () => {
-    setCurrentStartIndex((prev) => Math.max(0, prev - DAYS_PER_PAGE))
-  }
+  const daysInYear = useMemo(() => {
+    const yearStart = startOfYear(new Date(selectedYear, 0, 1))
+    const yearEnd = endOfYear(new Date(selectedYear, 11, 31))
+    return eachDayOfInterval({ start: yearStart, end: yearEnd })
+  }, [selectedYear])
 
-  const handleNext = () => {
-    if (schedule) {
-      const yearStart = startOfYear(new Date(selectedYear, 0, 1))
-      const yearEnd = endOfYear(new Date(selectedYear, 11, 31))
-      const daysInYear = eachDayOfInterval({ start: yearStart, end: yearEnd })
+  const handlePrevious = useCallback(() => {
+    setCurrentStartIndex((prev) => Math.max(0, prev - DAYS_PER_PAGE))
+  }, [DAYS_PER_PAGE])
+
+  const handleNext = useCallback(() => {
+    if (schedule && daysInYear.length > 0) {
       const maxIndex = daysInYear.length - DAYS_PER_PAGE
       setCurrentStartIndex((prev) => Math.min(maxIndex, prev + DAYS_PER_PAGE))
     }
-  }
+  }, [schedule, daysInYear.length, DAYS_PER_PAGE])
+
+  // Memoize displayed days to prevent unnecessary recalculations
+  const displayedDays = useMemo(() => {
+    if (!schedule) return []
+    return daysInYear.slice(currentStartIndex, currentStartIndex + DAYS_PER_PAGE)
+  }, [schedule, daysInYear, currentStartIndex, DAYS_PER_PAGE])
+
+  // Fetch notes for displayed days - optimized with cancellation
+  useEffect(() => {
+    if (!schedule || displayedDays.length === 0) return
+    
+    let cancelled = false
+    
+    const fetchNotesForDisplayedDays = async () => {
+      const notesMap = {}
+      
+      // Use Promise.all with staggered delays for better performance
+      const requests = displayedDays.map(async (day, i) => {
+        if (cancelled) return
+        
+        const dateStr = format(day, 'yyyy-MM-dd')
+        
+        // Skip if we already have this note
+        if (dayNotes[dateStr] !== undefined) {
+          notesMap[dateStr] = dayNotes[dateStr]
+          return
+        }
+        
+        // Small delay between requests (reduced from 100ms)
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 50))
+        }
+        
+        // Retry logic for failed requests (reduced retries)
+        let retries = 1
+        let success = false
+        
+        while (retries >= 0 && !success && !cancelled) {
+          try {
+            const response = await api.get(`/day-notes/${dateStr}`)
+            if (!cancelled) {
+              notesMap[dateStr] = response.data.note
+            }
+            success = true
+          } catch (error) {
+            if (error.response?.status === 404) {
+              success = true
+            } else if (error.response?.status === 502 && retries > 0) {
+              retries--
+              await new Promise(resolve => setTimeout(resolve, 200))
+            } else {
+              success = true
+            }
+          }
+        }
+      })
+      
+      await Promise.all(requests)
+      
+      if (!cancelled && Object.keys(notesMap).length > 0) {
+        setDayNotes((prev) => ({ ...prev, ...notesMap }))
+      }
+    }
+    
+    fetchNotesForDisplayedDays()
+    
+    return () => {
+      cancelled = true
+    }
+  }, [schedule, displayedDays, dayNotes])
 
   if (loading) {
     return (
@@ -153,28 +232,24 @@ export default function Schedule() {
     )
   }
 
-  const yearStart = startOfYear(new Date(selectedYear, 0, 1))
-  const yearEnd = endOfYear(new Date(selectedYear, 11, 31))
-  const daysInYear = eachDayOfInterval({ start: yearStart, end: yearEnd })
-  const displayedDays = schedule ? daysInYear.slice(currentStartIndex, currentStartIndex + DAYS_PER_PAGE) : []
   const canGoPrevious = currentStartIndex > 0
   const canGoNext = schedule && currentStartIndex + DAYS_PER_PAGE < daysInYear.length
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-4xl font-bold dark:text-dark-text light:text-light-text mb-2">Schedule</h1>
-          <p className="dark:text-dark-text-secondary light:text-light-text-secondary">Yearly duty rotation</p>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold dark:text-dark-text light:text-light-text mb-1 sm:mb-2">Schedule</h1>
+          <p className="text-sm sm:text-base dark:text-dark-text-secondary light:text-light-text-secondary">Yearly duty rotation</p>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2 sm:space-x-4 w-full sm:w-auto flex-wrap sm:flex-nowrap gap-2 sm:gap-0">
           <input
             type="number"
             value={selectedYear}
             onChange={handleYearChange}
             min="1900"
             max="2100"
-            className="px-4 py-2 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all w-32 font-semibold"
+            className="px-3 sm:px-4 py-2 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all w-20 sm:w-32 text-sm sm:text-base font-semibold flex-shrink-0"
             placeholder="Year"
             style={{
               color: 'inherit',
@@ -185,7 +260,7 @@ export default function Schedule() {
             <button
               onClick={generateSchedule}
               disabled={generating || !settings || !settings.persons || settings.persons.length === 0 || !settings.tasks || settings.tasks.length === 0}
-                  className="px-6 py-3 bg-gradient-to-r from-accent-indigo via-accent-violet to-accent-fuchsia text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-accent-indigo/30 hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="flex-1 sm:flex-none min-w-0 px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-base bg-gradient-to-r from-accent-indigo via-accent-violet to-accent-fuchsia text-white font-semibold rounded-lg sm:rounded-xl hover:shadow-lg hover:shadow-accent-indigo/30 hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 whitespace-nowrap"
             >
               {generating ? 'Generating...' : 'Generate Year'}
             </button>
@@ -194,10 +269,10 @@ export default function Schedule() {
             <button
               onClick={generateSchedule}
               disabled={generating}
-                  className="px-4 py-2 bg-gradient-to-r from-accent-sky via-accent-blue to-accent-indigo text-white border-0 text-sm font-semibold rounded-xl hover:shadow-lg hover:shadow-accent-sky/30 hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="flex-1 sm:flex-none min-w-fit px-3 sm:px-4 py-2 bg-gradient-to-r from-accent-sky via-accent-blue to-accent-indigo text-white border-0 text-xs sm:text-sm font-semibold rounded-lg sm:rounded-xl hover:shadow-lg hover:shadow-accent-sky/30 hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 whitespace-nowrap"
               title="Regenerate schedule"
             >
-              {generating ? 'Regenerating...' : <><FaSync className="inline w-4 h-4 mr-1" /> Regenerate</>}
+              {generating ? <><FaSync className="inline w-3 h-3 sm:w-4 sm:h-4 mr-1 animate-spin" /> <span>Regenerating...</span></> : <><FaSync className="inline w-3 h-3 sm:w-4 sm:h-4 mr-1" /> <span>Regenerate</span></>}
             </button>
           )}
         </div>
@@ -220,91 +295,108 @@ export default function Schedule() {
       )}
 
       {schedule && (
-        <div className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-2xl p-6 shadow-soft">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold dark:text-dark-text light:text-light-text mb-3">
+        <div className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft">
+          <div className="mb-4 sm:mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold dark:text-dark-text light:text-light-text mb-2 sm:mb-3">
               {selectedYear}
             </h2>
-            <div className="flex flex-wrap gap-4 text-sm mb-4">
-              <div className="dark:bg-dark-card light:bg-light-card px-3 py-1 rounded-lg">
+            <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm mb-3 sm:mb-4">
+              <div className="dark:bg-dark-card light:bg-light-card px-2 sm:px-3 py-1 rounded-lg">
                 <span className="dark:text-dark-text-secondary light:text-light-text-secondary">People: </span>
                 <span className="dark:text-dark-text light:text-light-text font-medium">{schedule.persons.join(', ')}</span>
               </div>
-              <div className="dark:bg-dark-card light:bg-light-card px-3 py-1 rounded-lg">
+              <div className="dark:bg-dark-card light:bg-light-card px-2 sm:px-3 py-1 rounded-lg">
                 <span className="dark:text-dark-text-secondary light:text-light-text-secondary">Tasks: </span>
                 <span className="dark:text-dark-text light:text-light-text font-medium">{schedule.tasks.join(', ')}</span>
               </div>
             </div>
-            <p className="text-xs dark:text-dark-text-tertiary light:text-light-text-tertiary mb-2 flex items-center gap-1">
-              <FaLightbulb className="w-3 h-3" /> To change person names, go to Admin Panel → Edit Settings → Click <FaEdit className="w-3 h-3 mx-1" /> next to a name, then regenerate this schedule
+            <p className="text-xs dark:text-dark-text-tertiary light:text-light-text-tertiary mb-2 flex flex-wrap items-center gap-1">
+              <FaLightbulb className="w-3 h-3 flex-shrink-0" /> <span className="hidden sm:inline">To change person names, go to Admin Panel → Edit Settings → Click</span><span className="sm:hidden">Tap</span> <FaEdit className="w-3 h-3 mx-1 flex-shrink-0" /> <span className="hidden sm:inline">next to a name, then regenerate this schedule</span>
             </p>
             
             {/* Date Selection and Navigation Controls */}
-            <div className="space-y-4 mt-4">
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center space-x-3">
-                  <label className="text-sm font-medium dark:text-dark-text-secondary light:text-light-text-secondary">
+            <div className="space-y-3 sm:space-y-4 mt-3 sm:mt-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full sm:w-auto">
+                  <label className="text-xs sm:text-sm font-medium dark:text-dark-text-secondary light:text-light-text-secondary whitespace-nowrap">
                     Jump to date:
                   </label>
-                  <input
-                    type="date"
-                    value={selectedStartDate || ''}
-                    onChange={handleDateSelect}
-                    min={`${selectedYear}-01-01`}
-                    max={`${selectedYear}-12-31`}
-                    className="px-3 py-2 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all"
-                  />
-                  <button
-                    onClick={jumpToToday}
-                    className="px-3 py-2 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text hover:opacity-80 transition-opacity text-sm font-medium"
-                    title="Jump to today"
-                  >
-                    <FaCalendarDay className="inline w-4 h-4 mr-1" /> Today
-                  </button>
+                  <div className="flex items-center space-x-2 w-full sm:w-auto">
+                    <input
+                      type="date"
+                      value={selectedStartDate || ''}
+                      onChange={handleDateSelect}
+                      min={`${selectedYear}-01-01`}
+                      max={`${selectedYear}-12-31`}
+                      className="flex-1 sm:flex-none px-2 sm:px-3 py-2 text-sm dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all"
+                    />
+                    <button
+                      onClick={jumpToToday}
+                      className="px-2 sm:px-3 py-2 text-xs sm:text-sm dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text hover:opacity-80 transition-opacity font-medium whitespace-nowrap"
+                      title="Jump to today"
+                    >
+                      <FaCalendarDay className="inline w-3 h-3 sm:w-4 sm:h-4 mr-1" /> Today
+                    </button>
+                  </div>
                 </div>
-                <div className="text-sm dark:text-dark-text-secondary light:text-light-text-secondary">
+                <div className="text-xs sm:text-sm dark:text-dark-text-secondary light:text-light-text-secondary w-full sm:w-auto text-center sm:text-left">
                   Showing {currentStartIndex + 1}-{Math.min(currentStartIndex + DAYS_PER_PAGE, daysInYear.length)} of {daysInYear.length} days
                 </div>
               </div>
-              <div className="flex items-center justify-center space-x-4">
+              {/* Navigation Buttons - Always visible on mobile */}
+              <div className="flex items-center justify-center gap-2 sm:gap-4 w-full py-2 sm:py-0">
                 <button
                   onClick={handlePrevious}
                   disabled={!canGoPrevious}
-                  className="px-4 py-2 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  className="flex-1 sm:flex-none min-w-[100px] sm:min-w-0 px-4 sm:px-4 py-3 sm:py-2 text-sm sm:text-sm dark:bg-dark-card light:bg-light-card border-2 dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text hover:opacity-80 hover:border-accent-blue transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-dark-border disabled:hover:border-light-border font-semibold shadow-md sm:shadow-none active:scale-95"
                 >
-                  ← Previous 5 Days
+                  ← <span className="hidden sm:inline">Previous 5 Days</span><span className="sm:hidden">Prev</span>
                 </button>
                 <button
                   onClick={handleNext}
                   disabled={!canGoNext}
-                  className="px-4 py-2 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  className="flex-1 sm:flex-none min-w-[100px] sm:min-w-0 px-4 sm:px-4 py-3 sm:py-2 text-sm sm:text-sm dark:bg-dark-card light:bg-light-card border-2 dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text hover:opacity-80 hover:border-accent-blue transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-dark-border disabled:hover:border-light-border font-semibold shadow-md sm:shadow-none active:scale-95"
                 >
-                  Next 5 Days →
+                  <span className="hidden sm:inline">Next 5 Days</span><span className="sm:hidden">Next</span> →
                 </button>
               </div>
             </div>
           </div>
 
           {/* 5 Days Display */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
             {displayedDays.map((day) => {
               const dayData = schedule.days.find(
                 (d) => format(new Date(d.date), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
               )
               const isWeekend = day.getDay() === 0 || day.getDay() === 6
+              const isToday = format(day, 'yyyy-MM-dd') === todayDate
+              
+              const dateStr = format(day, 'yyyy-MM-dd')
+              const noteText = dayNotes[dateStr] || (dayData && dayData.note)
+              const hasNote = !!noteText
               
               return (
                 <div
                   key={day.toISOString()}
-                  className={`dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl p-4 min-h-[200px] hover:shadow-soft transition-shadow ${
+                  className={`relative dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl p-3 sm:p-4 min-h-[150px] sm:min-h-[180px] lg:min-h-[200px] hover:shadow-soft transition-shadow ${
                     isWeekend ? 'opacity-90' : ''
+                  } ${
+                    isToday ? 'ring-4 ring-[#22C55E] dark:ring-[#15803D] bg-[#22C55E]/10 dark:bg-[#15803D]/20 border-[#22C55E] dark:border-[#15803D] shadow-2xl dark:shadow-[#15803D]/50 light:shadow-[#22C55E]/70' : ''
                   }`}
                 >
-                  <div className="mb-3">
-                    <div className="text-sm font-semibold dark:text-dark-text-secondary light:text-light-text-secondary mb-1">
+                  {hasNote && (
+                    <NoteFloatingWidget 
+                      date={dateStr}
+                      note={noteText}
+                      onClick={(date) => navigate(`/notes?date=${date}`)}
+                    />
+                  )}
+                  <div className="mb-2 sm:mb-3">
+                    <div className="text-xs sm:text-sm font-semibold dark:text-dark-text-secondary light:text-light-text-secondary mb-1">
                       {format(day, 'EEE')}
                     </div>
-                    <div className="text-2xl font-bold dark:text-dark-text light:text-light-text">
+                    <div className="text-xl sm:text-2xl font-bold dark:text-dark-text light:text-light-text">
                       {format(day, 'd')}
                     </div>
                     <div className="text-xs dark:text-dark-text-tertiary light:text-light-text-tertiary mt-1">
@@ -317,21 +409,18 @@ export default function Schedule() {
                     )}
                   </div>
                   {dayData ? (
-                    <div className="space-y-2">
+                    <div className="space-y-1.5 sm:space-y-2">
                       {Object.entries(dayData.assignments).map(([task, person]) => (
-                        <div key={task} className="text-sm">
+                        <div key={task} className="text-xs sm:text-sm">
                           <span className="dark:text-dark-text-secondary light:text-light-text-secondary">{task}:</span>
                           <span className="dark:text-dark-text light:text-light-text ml-1 font-semibold">{person}</span>
                         </div>
                       ))}
-                      {dayData.note && (
-                        <div className="mt-3 pt-3 border-t dark:border-dark-border light:border-light-border">
-                          <p className="text-xs dark:text-dark-text-secondary light:text-light-text-secondary italic">{dayData.note}</p>
-                        </div>
-                      )}
                     </div>
                   ) : (
-                    <div className="text-sm dark:text-dark-text-tertiary light:text-light-text-tertiary">No assignments</div>
+                    <div className="space-y-1.5 sm:space-y-2">
+                      <div className="text-xs sm:text-sm dark:text-dark-text-tertiary light:text-light-text-tertiary">No assignments</div>
+                    </div>
                   )}
                 </div>
               )

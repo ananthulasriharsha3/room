@@ -1,27 +1,38 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { AnimatePresence } from 'framer-motion'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import Dashboard from './pages/Dashboard'
-import Schedule from './pages/Schedule'
-import Expenses from './pages/Expenses'
-import ShoppingItems from './pages/ShoppingItems'
-import DayNotes from './pages/DayNotes'
-import StockItems from './pages/StockItems'
-import GroceryPurchases from './pages/GroceryPurchases'
-import AdminPanel from './pages/AdminPanel'
 import Layout from './components/Layout'
+import { PageTransition } from './components/layout/PageTransition'
+
+// Lazy load pages for better performance
+const Login = lazy(() => import('./pages/Login'))
+const Register = lazy(() => import('./pages/Register'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Schedule = lazy(() => import('./pages/Schedule'))
+const Expenses = lazy(() => import('./pages/Expenses'))
+const ShoppingItems = lazy(() => import('./pages/ShoppingItems'))
+const DayNotes = lazy(() => import('./pages/DayNotes'))
+const StockItems = lazy(() => import('./pages/StockItems'))
+const GroceryPurchases = lazy(() => import('./pages/GroceryPurchases'))
+const AdminPanel = lazy(() => import('./pages/AdminPanel'))
+
+// Loading component
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="text-center">
+      <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+      <p className="mt-4 text-sm text-gray-400">Loading...</p>
+    </div>
+  </div>
+)
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <div className="text-white">Loading...</div>
-      </div>
-    )
+    return <PageLoader />
   }
   
   return user ? children : <Navigate to="/login" />
@@ -29,37 +40,133 @@ function ProtectedRoute({ children }) {
 
 function AppRoutes() {
   const { user } = useAuth()
+  const location = useLocation()
   
   return (
-    <Routes>
-      <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
-      <Route path="/register" element={!user ? <Register /> : <Navigate to="/dashboard" />} />
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Navigate to="/dashboard" />} />
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="schedule" element={<Schedule />} />
-        <Route path="expenses" element={<Expenses />} />
-        <Route path="shopping" element={<ShoppingItems />} />
-        <Route path="notes" element={<DayNotes />} />
-        <Route path="stock" element={<StockItems />} />
-        <Route path="grocery" element={<GroceryPurchases />} />
-        <Route path="admin" element={<AdminPanel />} />
-      </Route>
-    </Routes>
+    <Suspense fallback={<PageLoader />}>
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          <Route 
+            path="/login" 
+            element={
+              <Suspense fallback={<PageLoader />}>
+                {!user ? <Login /> : <Navigate to="/dashboard" />}
+              </Suspense>
+            } 
+          />
+          <Route 
+            path="/register" 
+            element={
+              <Suspense fallback={<PageLoader />}>
+                {!user ? <Register /> : <Navigate to="/dashboard" />}
+              </Suspense>
+            } 
+          />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Navigate to="/dashboard" />} />
+            <Route 
+              path="dashboard" 
+              element={
+                <PageTransition>
+                  <Suspense fallback={<PageLoader />}>
+                    <Dashboard />
+                  </Suspense>
+                </PageTransition>
+              } 
+            />
+            <Route 
+              path="schedule" 
+              element={
+                <PageTransition>
+                  <Suspense fallback={<PageLoader />}>
+                    <Schedule />
+                  </Suspense>
+                </PageTransition>
+              } 
+            />
+            <Route 
+              path="expenses" 
+              element={
+                <PageTransition>
+                  <Suspense fallback={<PageLoader />}>
+                    <Expenses />
+                  </Suspense>
+                </PageTransition>
+              } 
+            />
+            <Route 
+              path="shopping" 
+              element={
+                <PageTransition>
+                  <Suspense fallback={<PageLoader />}>
+                    <ShoppingItems />
+                  </Suspense>
+                </PageTransition>
+              } 
+            />
+            <Route 
+              path="notes" 
+              element={
+                <PageTransition>
+                  <Suspense fallback={<PageLoader />}>
+                    <DayNotes />
+                  </Suspense>
+                </PageTransition>
+              } 
+            />
+            <Route 
+              path="stock" 
+              element={
+                <PageTransition>
+                  <Suspense fallback={<PageLoader />}>
+                    <StockItems />
+                  </Suspense>
+                </PageTransition>
+              } 
+            />
+            <Route 
+              path="grocery" 
+              element={
+                <PageTransition>
+                  <Suspense fallback={<PageLoader />}>
+                    <GroceryPurchases />
+                  </Suspense>
+                </PageTransition>
+              } 
+            />
+            <Route 
+              path="admin" 
+              element={
+                <PageTransition>
+                  <Suspense fallback={<PageLoader />}>
+                    <AdminPanel />
+                  </Suspense>
+                </PageTransition>
+              } 
+            />
+          </Route>
+        </Routes>
+      </AnimatePresence>
+    </Suspense>
   )
 }
 
 function App() {
   return (
     <ThemeProvider>
-      <Router>
+      <Router
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <AuthProvider>
           <AppRoutes />
         </AuthProvider>

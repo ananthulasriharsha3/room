@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import api from '../utils/api'
 import { format, startOfMonth, parseISO } from 'date-fns'
 import { FaDollarSign, FaShoppingCart } from 'react-icons/fa'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
+import { AnimatedCard } from '../components/ui/AnimatedCard'
+import { AnimatedButton } from '../components/ui/AnimatedButton'
+import { ScrollReveal } from '../components/ui/ScrollReveal'
+import { SkeletonLoader } from '../components/ui/SkeletonLoader'
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -202,48 +207,75 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="dark:text-dark-text-secondary light:text-light-text-secondary">Loading...</div>
+      <div className="space-y-4 sm:space-y-6 lg:space-y-8">
+        <div>
+          <div className="h-8 sm:h-10 bg-gradient-to-r from-transparent via-dark-border to-transparent dark:via-dark-border light:via-light-border rounded w-48 mb-2 animate-pulse"></div>
+          <div className="h-4 sm:h-5 bg-gradient-to-r from-transparent via-dark-border to-transparent dark:via-dark-border light:via-light-border rounded w-64 animate-pulse"></div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <SkeletonLoader count={3} />
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-4xl font-bold dark:text-dark-text light:text-light-text mb-2">Dashboard</h1>
-        <p className="dark:text-dark-text-secondary light:text-light-text-secondary">Overview of your room duties and expenses</p>
-      </div>
+    <div className="space-y-4 sm:space-y-6 lg:space-y-8">
+      <ScrollReveal>
+        <div>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold dark:text-dark-text light:text-light-text mb-2">Dashboard</h1>
+          <p className="text-sm sm:text-base dark:text-dark-text-secondary light:text-light-text-secondary">Overview of your room duties and expenses</p>
+        </div>
+      </ScrollReveal>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="bg-gradient-to-br from-accent-indigo/40 via-accent-violet/40 to-accent-fuchsia/40 dark:bg-gradient-to-br dark:from-accent-indigo/50 dark:via-accent-violet/50 dark:to-accent-fuchsia/50 border-4 border-accent-indigo/60 dark:border-accent-indigo/70 rounded-2xl p-6 shadow-2xl hover:shadow-accent-indigo/50 hover:scale-105 transition-all duration-300">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-accent-indigo dark:text-accent-violet text-base font-extrabold uppercase tracking-wide">Total Expenses</h3>
-            <div className="p-4 bg-gradient-to-br from-accent-indigo via-accent-violet to-accent-fuchsia rounded-xl shadow-xl animate-pulse">
-              <FaDollarSign className="text-3xl text-white" />
+      <ScrollReveal>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
+          <motion.div 
+            className="bg-gradient-to-br from-accent-indigo/40 via-accent-violet/40 to-accent-fuchsia/40 dark:bg-gradient-to-br dark:from-accent-indigo/50 dark:via-accent-violet/50 dark:to-accent-fuchsia/50 border-2 sm:border-4 border-accent-indigo/60 dark:border-accent-indigo/70 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.1 }}
+            whileHover={{ scale: 1.02, boxShadow: "0 12px 24px rgba(94, 58, 255, 0.3)" }}
+          >
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <h3 className="text-accent-indigo dark:text-accent-violet text-xs sm:text-sm lg:text-base font-extrabold uppercase tracking-wide">Total Expenses</h3>
+            <div className="p-2 sm:p-4 bg-gradient-to-br from-accent-indigo via-accent-violet to-accent-fuchsia rounded-lg sm:rounded-xl shadow-xl animate-pulse">
+              <FaDollarSign className="text-xl sm:text-2xl lg:text-3xl text-white" />
             </div>
           </div>
-          <p className="text-5xl font-extrabold bg-gradient-to-r from-accent-indigo via-accent-violet to-accent-fuchsia bg-clip-text text-transparent mb-2 drop-shadow-lg">₹{stats.expenses.total.toFixed(2)}</p>
-          <p className="text-sm font-bold dark:text-dark-text-secondary light:text-light-text-secondary">{stats.expenses.count} entries</p>
-        </div>
+          <p className="text-3xl sm:text-4xl lg:text-5xl font-extrabold bg-gradient-to-r from-accent-indigo via-accent-violet to-accent-fuchsia bg-clip-text text-transparent mb-2 drop-shadow-lg">₹{stats.expenses.total.toFixed(2)}</p>
+          <p className="text-xs sm:text-sm font-bold dark:text-dark-text-secondary light:text-light-text-secondary">{stats.expenses.count} entries</p>
+          </motion.div>
 
-        <div className="bg-gradient-to-br from-accent-emerald/40 via-accent-teal/40 to-accent-cyan/40 dark:bg-gradient-to-br dark:from-accent-emerald/50 dark:via-accent-teal/50 dark:to-accent-cyan/50 border-4 border-accent-emerald/60 dark:border-accent-emerald/70 rounded-2xl p-6 shadow-2xl hover:shadow-accent-emerald/50 hover:scale-105 transition-all duration-300">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-accent-emerald dark:text-accent-teal text-base font-extrabold uppercase tracking-wide">Shopping Items</h3>
-            <div className="p-4 bg-gradient-to-br from-accent-emerald via-accent-teal to-accent-cyan rounded-xl shadow-xl animate-pulse">
-              <FaShoppingCart className="text-3xl text-white" />
+          <motion.div 
+            className="bg-gradient-to-br from-accent-emerald/40 via-accent-teal/40 to-accent-cyan/40 dark:bg-gradient-to-br dark:from-accent-emerald/50 dark:via-accent-teal/50 dark:to-accent-cyan/50 border-2 sm:border-4 border-accent-emerald/60 dark:border-accent-emerald/70 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.2 }}
+            whileHover={{ scale: 1.02, boxShadow: "0 12px 24px rgba(0, 255, 136, 0.3)" }}
+          >
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <h3 className="text-accent-emerald dark:text-accent-teal text-xs sm:text-sm lg:text-base font-extrabold uppercase tracking-wide">Shopping Items</h3>
+            <div className="p-2 sm:p-4 bg-gradient-to-br from-accent-emerald via-accent-teal to-accent-cyan rounded-lg sm:rounded-xl shadow-xl animate-pulse">
+              <FaShoppingCart className="text-xl sm:text-2xl lg:text-3xl text-white" />
             </div>
           </div>
-          <p className="text-5xl font-extrabold bg-gradient-to-r from-accent-emerald via-accent-teal to-accent-cyan bg-clip-text text-transparent mb-2 drop-shadow-lg">{stats.shoppingItems.total}</p>
-          <p className="text-sm font-bold dark:text-dark-text-secondary light:text-light-text-secondary">{stats.shoppingItems.pending} pending</p>
-        </div>
+          <p className="text-3xl sm:text-4xl lg:text-5xl font-extrabold bg-gradient-to-r from-accent-emerald via-accent-teal to-accent-cyan bg-clip-text text-transparent mb-2 drop-shadow-lg">{stats.shoppingItems.total}</p>
+          <p className="text-xs sm:text-sm font-bold dark:text-dark-text-secondary light:text-light-text-secondary">{stats.shoppingItems.pending} pending</p>
+          </motion.div>
 
-        <div className="bg-gradient-to-br from-accent-rose/40 via-accent-pink/40 to-accent-fuchsia/40 dark:bg-gradient-to-br dark:from-accent-rose/50 dark:via-accent-pink/50 dark:to-accent-fuchsia/50 border-4 border-accent-rose/60 dark:border-accent-rose/70 rounded-2xl p-6 shadow-2xl hover:shadow-accent-rose/50 hover:scale-105 transition-all duration-300">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-accent-rose dark:text-accent-pink text-base font-extrabold uppercase tracking-wide">Quick Actions</h3>
-            <div className="p-4 bg-gradient-to-br from-accent-rose via-accent-pink to-accent-fuchsia rounded-xl shadow-xl animate-pulse">
-              <span className="text-3xl">⚡</span>
+          <motion.div 
+            className="bg-gradient-to-br from-accent-rose/40 via-accent-pink/40 to-accent-fuchsia/40 dark:bg-gradient-to-br dark:from-accent-rose/50 dark:via-accent-pink/50 dark:to-accent-fuchsia/50 border-2 sm:border-4 border-accent-rose/60 dark:border-accent-rose/70 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl sm:col-span-2 lg:col-span-1"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.3 }}
+            whileHover={{ scale: 1.02, boxShadow: "0 12px 24px rgba(255, 0, 110, 0.3)" }}
+          >
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <h3 className="text-accent-rose dark:text-accent-pink text-xs sm:text-sm lg:text-base font-extrabold uppercase tracking-wide">Quick Actions</h3>
+            <div className="p-2 sm:p-4 bg-gradient-to-br from-accent-rose via-accent-pink to-accent-fuchsia rounded-lg sm:rounded-xl shadow-xl animate-pulse">
+              <span className="text-xl sm:text-2xl lg:text-3xl">⚡</span>
             </div>
           </div>
           <div className="flex flex-col space-y-3 mt-4">
@@ -260,32 +292,35 @@ export default function Dashboard() {
               Add Expense <span className="ml-1 group-hover:translate-x-1 transition-transform">→</span>
             </Link>
           </div>
+          </motion.div>
         </div>
-      </div>
+      </ScrollReveal>
 
       {/* Monthly Expenditure Pie Chart */}
-      <div className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-2xl p-6 shadow-soft">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold dark:text-dark-text light:text-light-text mb-2">
+      <ScrollReveal>
+        <AnimatedCard className="p-4 sm:p-6">
+        <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex-1">
+            <h2 className="text-lg sm:text-xl lg:text-2xl font-bold dark:text-dark-text light:text-light-text mb-1 sm:mb-2">
               Monthly Expenditure - {format(new Date(), 'MMMM yyyy')}
             </h2>
-            <p className="text-sm dark:text-dark-text-secondary light:text-light-text-secondary">
+            <p className="text-xs sm:text-sm dark:text-dark-text-secondary light:text-light-text-secondary">
               Breakdown of expenses and groceries for this month
             </p>
           </div>
-          <button
+          <AnimatedButton
             onClick={handleCloseMonth}
             disabled={closingMonth}
-            className="px-4 py-2 bg-gradient-to-r from-accent-rose via-accent-pink to-accent-fuchsia text-white font-bold rounded-lg hover:from-accent-pink hover:via-accent-fuchsia hover:to-accent-rose transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+            variant="danger"
+            className="w-full sm:w-auto px-3 sm:px-4 py-2 text-sm sm:text-base"
           >
             {closingMonth ? 'Closing...' : 'Close Month'}
-          </button>
+          </AnimatedButton>
         </div>
         {monthlyData.length > 0 ? (
-          <div className="flex flex-col md:flex-row items-center justify-center gap-8">
-            <div className="w-full md:w-1/2 max-w-md overflow-visible">
-              <ResponsiveContainer width="100%" height={400}>
+          <div className="flex flex-col lg:flex-row items-center justify-center gap-4 sm:gap-6 lg:gap-8">
+            <div className="w-full lg:w-1/2 max-w-md overflow-visible">
+              <ResponsiveContainer width="100%" height={300} className="sm:h-[350px] lg:h-[400px]">
                 <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                   <Pie
                     data={monthlyData}
@@ -316,32 +351,32 @@ export default function Dashboard() {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="w-full md:w-1/2 space-y-4">
+            <div className="w-full lg:w-1/2 space-y-3 sm:space-y-4">
               {monthlyData.map((item, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between p-4 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl"
+                  className="flex items-center justify-between p-3 sm:p-4 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl"
                 >
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2 sm:space-x-3">
                     <div
-                      className="w-6 h-6 rounded-full shadow-lg ring-2 ring-white/20"
+                      className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 rounded-full shadow-lg ring-2 ring-white/20 flex-shrink-0"
                       style={{ backgroundColor: item.color }}
                     />
-                    <span className="font-semibold text-lg dark:text-dark-text light:text-light-text">
+                    <span className="font-semibold text-sm sm:text-base lg:text-lg dark:text-dark-text light:text-light-text">
                       {item.name}
                     </span>
                   </div>
-                  <span className="text-2xl font-bold bg-gradient-to-r from-accent-indigo to-accent-violet bg-clip-text text-transparent">
+                  <span className="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-accent-indigo to-accent-violet bg-clip-text text-transparent">
                     ₹{item.value.toFixed(2)}
                   </span>
                 </div>
               ))}
-              <div className="pt-4 border-t-2 border-accent-fuchsia/30">
+              <div className="pt-3 sm:pt-4 border-t-2 border-accent-fuchsia/30">
                 <div className="flex items-center justify-between">
-                  <span className="text-lg font-semibold dark:text-dark-text light:text-light-text">
+                  <span className="text-base sm:text-lg font-semibold dark:text-dark-text light:text-light-text">
                     Total
                   </span>
-                  <span className="text-3xl font-bold bg-gradient-to-r from-accent-fuchsia via-accent-rose to-accent-pink bg-clip-text text-transparent">
+                  <span className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-accent-fuchsia via-accent-rose to-accent-pink bg-clip-text text-transparent">
                     ₹{monthlyData.reduce((sum, item) => sum + item.value, 0).toFixed(2)}
                   </span>
                 </div>
@@ -358,20 +393,22 @@ export default function Dashboard() {
             </p>
           </div>
         )}
-      </div>
+        </AnimatedCard>
+      </ScrollReveal>
 
       {/* Historical Months */}
       {historicalMonths.length > 0 && (
-        <div className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-2xl p-6 shadow-soft">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold dark:text-dark-text light:text-light-text mb-2">
+        <ScrollReveal>
+          <AnimatedCard className="p-4 sm:p-6">
+          <div className="mb-4 sm:mb-6">
+            <h2 className="text-lg sm:text-xl lg:text-2xl font-bold dark:text-dark-text light:text-light-text mb-1 sm:mb-2">
               Historical Months
             </h2>
-            <p className="text-sm dark:text-dark-text-secondary light:text-light-text-secondary">
+            <p className="text-xs sm:text-sm dark:text-dark-text-secondary light:text-light-text-secondary">
               Closed months with expenses and groceries
             </p>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {historicalMonths.map((monthData) => {
               const monthDate = parseISO(`${monthData.month}-01`)
               const total = monthData.expensesTotal + monthData.groceriesTotal
@@ -379,17 +416,17 @@ export default function Dashboard() {
               return (
                 <div
                   key={monthData.month}
-                  className="p-4 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl"
+                  className="p-3 sm:p-4 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl"
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-xl font-bold dark:text-dark-text light:text-light-text">
+                  <div className="flex items-center justify-between mb-2 sm:mb-3">
+                    <h3 className="text-base sm:text-lg lg:text-xl font-bold dark:text-dark-text light:text-light-text">
                       {format(monthDate, 'MMMM yyyy')}
                     </h3>
-                    <span className="text-2xl font-bold bg-gradient-to-r from-accent-indigo to-accent-violet bg-clip-text text-transparent">
+                    <span className="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-accent-indigo to-accent-violet bg-clip-text text-transparent">
                       ₹{total.toFixed(2)}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-xs sm:text-sm">
                     <div>
                       <span className="dark:text-dark-text-secondary light:text-light-text-secondary">Expenses: </span>
                       <span className="font-semibold dark:text-dark-text light:text-light-text">
@@ -407,44 +444,56 @@ export default function Dashboard() {
               )
             })}
           </div>
-        </div>
+          </AnimatedCard>
+        </ScrollReveal>
       )}
 
       {/* Recent Expenses */}
-      <div className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-2xl p-6 shadow-soft">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold dark:text-dark-text light:text-light-text">Recent Expenses</h2>
+      <ScrollReveal>
+        <AnimatedCard className="p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <h2 className="text-lg sm:text-xl lg:text-2xl font-bold dark:text-dark-text light:text-light-text">Recent Expenses</h2>
           <Link
             to="/expenses"
-            className="text-sm dark:text-dark-text-secondary light:text-light-text-secondary hover:dark:text-dark-text hover:light:text-light-text transition-colors font-medium"
+            className="text-xs sm:text-sm dark:text-dark-text-secondary light:text-light-text-secondary hover:dark:text-dark-text hover:light:text-light-text transition-colors font-medium"
           >
             View all →
           </Link>
         </div>
         {stats.recentExpenses.length === 0 ? (
-          <p className="dark:text-dark-text-secondary light:text-light-text-secondary text-center py-8">No expenses yet</p>
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="dark:text-dark-text-secondary light:text-light-text-secondary text-center py-6 sm:py-8 text-sm sm:text-base"
+          >
+            No expenses yet
+          </motion.p>
         ) : (
-          <div className="space-y-3">
-            {stats.recentExpenses.map((expense) => (
-              <div
+          <div className="space-y-2 sm:space-y-3">
+            {stats.recentExpenses.map((expense, idx) => (
+              <AnimatedCard
                 key={expense.id}
-                className="flex items-center justify-between p-4 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl hover:shadow-soft transition-shadow"
+                delay={idx * 0.05}
+                className="p-3 sm:p-4"
               >
-                <div className="flex-1">
-                  <p className="font-semibold dark:text-dark-text light:text-light-text">{expense.person}</p>
-                  <p className="text-sm dark:text-dark-text-secondary light:text-light-text-secondary mt-1">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
+                <div className="flex-1 w-full sm:w-auto">
+                  <p className="font-semibold text-sm sm:text-base dark:text-dark-text light:text-light-text">{expense.person}</p>
+                  <p className="text-xs sm:text-sm dark:text-dark-text-secondary light:text-light-text-secondary mt-1">
                     {expense.description || 'No description'}
                   </p>
                   <p className="text-xs dark:text-dark-text-tertiary light:text-light-text-tertiary mt-1">
                     {format(new Date(expense.timestamp), 'MMM dd, yyyy HH:mm')}
                   </p>
                 </div>
-                <p className="text-xl font-bold dark:text-dark-text light:text-light-text ml-4">₹{expense.amount.toFixed(2)}</p>
-              </div>
+                <p className="text-lg sm:text-xl font-bold dark:text-dark-text light:text-light-text sm:ml-4">₹{expense.amount.toFixed(2)}</p>
+                </div>
+              </AnimatedCard>
             ))}
           </div>
         )}
-      </div>
+        </AnimatedCard>
+      </ScrollReveal>
     </div>
   )
 }

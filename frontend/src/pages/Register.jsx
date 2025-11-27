@@ -74,8 +74,14 @@ export default function Register() {
                 required
                 minLength={1}
                 maxLength={100}
+                autoComplete="name"
                 className="w-full px-4 py-3 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text placeholder:dark:text-dark-text-tertiary placeholder:light:text-light-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-purple/50 focus:border-accent-purple/50 transition-all"
                 placeholder="Your name"
+                style={{
+                  ...(theme === 'dark' && { backgroundColor: '#1F2937' }),
+                  color: 'inherit',
+                  WebkitTextFillColor: 'inherit'
+                }}
               />
             </div>
 
@@ -89,8 +95,14 @@ export default function Register() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
                 className="w-full px-4 py-3 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text placeholder:dark:text-dark-text-tertiary placeholder:light:text-light-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-purple/50 focus:border-accent-purple/50 transition-all"
                 placeholder="you@example.com"
+                style={{
+                  ...(theme === 'dark' && { backgroundColor: '#1F2937' }),
+                  color: 'inherit',
+                  WebkitTextFillColor: 'inherit'
+                }}
               />
             </div>
 
@@ -106,8 +118,14 @@ export default function Register() {
                 required
                 minLength={6}
                 maxLength={128}
+                autoComplete="new-password"
                 className="w-full px-4 py-3 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text placeholder:dark:text-dark-text-tertiary placeholder:light:text-light-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-purple/50 focus:border-accent-purple/50 transition-all"
                 placeholder="••••••••"
+                style={{
+                  ...(theme === 'dark' && { backgroundColor: '#1F2937' }),
+                  color: 'inherit',
+                  WebkitTextFillColor: 'inherit'
+                }}
               />
               <p className="mt-1 text-xs dark:text-dark-text-tertiary light:text-light-text-tertiary">Minimum 6 characters</p>
             </div>

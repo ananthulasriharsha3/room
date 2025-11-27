@@ -348,6 +348,7 @@ class ShoppingItemResponse(BaseModel):
     total_votes: int
     created_at: datetime
     created_by: str
+    creator_name: Optional[str] = None
     is_completed: bool = False
 
 
@@ -384,9 +385,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Room Duties & Expenses API", lifespan=lifespan)
 
+# Get allowed origins from environment variable
+ALLOWED_ORIGINS = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5173,http://localhost:3000"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1090,6 +1097,18 @@ def _item_from_supabase(record: Dict[str, Any]) -> ShoppingItemResponse:
     created_by_raw = record.get("created_by")
     created_by = str(created_by_raw) if created_by_raw is not None else ""
     is_completed = bool(record.get("is_completed", False))
+    
+    # Get creator name
+    creator_name = None
+    if created_by:
+        try:
+            all_users = _get_all_users()
+            creator = next((u for u in all_users if u["id"] == created_by), None)
+            if creator:
+                creator_name = creator.get("display_name") or creator.get("email", "Unknown")
+        except Exception:
+            pass  # If we can't get user info, just leave it as None
+    
     return ShoppingItemResponse(
         id=int(record["id"]),
         name=str(record["name"]),
@@ -1098,6 +1117,7 @@ def _item_from_supabase(record: Dict[str, Any]) -> ShoppingItemResponse:
         created_at=created_at,
         created_by=created_by,
         is_completed=is_completed,
+        creator_name=creator_name,
     )
 
 
@@ -1112,6 +1132,18 @@ def _item_from_memory(record: Dict[str, Any]) -> ShoppingItemResponse:
     created_by_raw = record.get("created_by")
     created_by = str(created_by_raw) if created_by_raw is not None else ""
     is_completed = bool(record.get("is_completed", False))
+    
+    # Get creator name
+    creator_name = None
+    if created_by:
+        try:
+            all_users = _get_all_users()
+            creator = next((u for u in all_users if u["id"] == created_by), None)
+            if creator:
+                creator_name = creator.get("display_name") or creator.get("email", "Unknown")
+        except Exception:
+            pass  # If we can't get user info, just leave it as None
+    
     return ShoppingItemResponse(
         id=int(record["id"]),
         name=str(record["name"]),
@@ -1120,6 +1152,7 @@ def _item_from_memory(record: Dict[str, Any]) -> ShoppingItemResponse:
         created_at=created_at,
         created_by=created_by,
         is_completed=is_completed,
+        creator_name=creator_name,
     )
 
 
@@ -1582,6 +1615,8 @@ class DayNotePayload(BaseModel):
 class DayNoteResponse(BaseModel):
     date: date
     note: str
+    created_by: Optional[str] = None
+    creator_name: Optional[str] = None
 
 
 class StockItemCreate(BaseModel):
@@ -1629,6 +1664,9 @@ def set_day_note(payload: DayNotePayload, current_user: UserPublic = Depends(get
             raise HTTPException(status_code=500, detail="Failed to save day note.")
         record = data[0]
         
+        # Get creator name for response
+        creator_name = current_user.display_name or current_user.email
+        
         # Send emails to all users
         all_users = _get_all_users()
         note_date_str = payload.date.strftime("%B %d, %Y")
@@ -1673,9 +1711,64 @@ def set_day_note(payload: DayNotePayload, current_user: UserPublic = Depends(get
             
             _send_email_safe(user_email, f"Special Day: {note_date_str}", plain_text, html_content)
         
-        return DayNoteResponse(date=date.fromisoformat(record["date"]), note=record["note"])
+        return DayNoteResponse(
+            date=date.fromisoformat(record["date"]), 
+            note=record["note"],
+            created_by=current_user.id,
+            creator_name=creator_name
+        )
     except Exception as error:
         raise _handle_supabase_error(error, "saving day note") from error
+
+
+@app.get("/day-notes/{date_str}", response_model=DayNoteResponse)
+def get_day_note(
+    date_str: str,
+    current_user: UserPublic = Depends(get_current_user)
+) -> DayNoteResponse:
+    """Get a day note for a specific date."""
+    try:
+        target_date = date.fromisoformat(date_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+    
+    def fetch_note():
+        response = (
+            supabase_client.table(DAY_NOTES_TABLE)
+            .select("date, note, created_by")
+            .eq("date", target_date.isoformat())
+            .limit(1)
+            .execute()
+        )
+        return response
+    
+    try:
+        response = _retry_supabase_operation(fetch_note, operation_name="fetching day note")
+        
+        data = response.data or []
+        if not data:
+            raise HTTPException(status_code=404, detail="Day note not found for this date.")
+        
+        record = data[0]
+        creator_id = record.get("created_by")
+        creator_name = None
+        
+        if creator_id:
+            all_users = _get_all_users()
+            creator = next((u for u in all_users if u["id"] == creator_id), None)
+            if creator:
+                creator_name = creator.get("display_name") or creator.get("email", "Unknown")
+        
+        return DayNoteResponse(
+            date=date.fromisoformat(record["date"]),
+            note=record["note"],
+            created_by=creator_id,
+            creator_name=creator_name
+        )
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise _handle_supabase_error(error, "fetching day note") from error
 
 
 @app.delete("/day-notes/{date_str}")
@@ -2081,6 +2174,7 @@ except Exception as e:
 def _preprocess_image(image: Image.Image) -> Image.Image:
     """Preprocess image to improve OCR accuracy."""
     from PIL import ImageEnhance, ImageFilter
+    import numpy as np
     
     # Convert to RGB if necessary
     if image.mode != 'RGB':
@@ -2090,22 +2184,47 @@ def _preprocess_image(image: Image.Image) -> Image.Image:
     if image.mode == 'RGB':
         image = image.convert('L')  # Grayscale
     
-    # Enhance contrast
+    # Apply adaptive thresholding for better text extraction
+    # Convert PIL to numpy array for thresholding
+    img_array = np.array(image)
+    
+    # Apply Otsu's thresholding for better text/background separation
+    from PIL import Image as PILImage
+    # Use simple thresholding if we can't use cv2
+    try:
+        import cv2
+        # Apply adaptive thresholding
+        thresh = cv2.adaptiveThreshold(
+            img_array, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+            cv2.THRESH_BINARY, 11, 2
+        )
+        image = PILImage.fromarray(thresh)
+    except ImportError:
+        # Fallback: manual thresholding
+        threshold = np.mean(img_array)
+        img_array = np.where(img_array > threshold, 255, 0).astype(np.uint8)
+        image = PILImage.fromarray(img_array)
+    
+    # Enhance contrast (more aggressive)
     enhancer = ImageEnhance.Contrast(image)
-    image = enhancer.enhance(2.0)  # Increase contrast by 2x
+    image = enhancer.enhance(2.5)  # Increase contrast by 2.5x
     
     # Enhance sharpness
     enhancer = ImageEnhance.Sharpness(image)
-    image = enhancer.enhance(2.0)  # Increase sharpness by 2x
+    image = enhancer.enhance(2.5)  # Increase sharpness by 2.5x
     
-    # Apply slight denoising (median filter)
+    # Apply denoising (median filter)
     image = image.filter(ImageFilter.MedianFilter(size=3))
+    
+    # Apply additional sharpening
+    image = image.filter(ImageFilter.SHARPEN)
     
     # Resize if image is too small (OCR works better on larger images)
     width, height = image.size
-    if width < 800 or height < 800:
+    min_size = 1200  # Increased minimum size for better OCR
+    if width < min_size or height < min_size:
         # Scale up while maintaining aspect ratio
-        scale_factor = max(800 / width, 800 / height)
+        scale_factor = max(min_size / width, min_size / height)
         new_width = int(width * scale_factor)
         new_height = int(height * scale_factor)
         image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
@@ -2130,11 +2249,16 @@ def _process_bill_image(image_data: bytes) -> str:
         # PSM 6: Assume a single uniform block of text (good for receipts)
         # PSM 11: Sparse text (good for itemized lists)
         # PSM 12: Sparse text with OSD (Orientation and Script Detection)
+        # PSM 4: Assume a single column of text of variable sizes
+        # PSM 3: Fully automatic page segmentation, but no OSD
         
+        # Include Indian currency symbol (₹) and common bill characters
         ocr_configs = [
-            '--psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,:;-$ ',
-            '--psm 11 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,:;-$ ',
-            '--psm 12 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,:;-$ ',
+            '--psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,:;-$₹ /',
+            '--psm 11 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,:;-$₹ /',
+            '--psm 12 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,:;-$₹ /',
+            '--psm 4 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,:;-$₹ /',
+            '--psm 3',  # No whitelist for this one to catch any missed characters
         ]
         
         texts = []
@@ -2257,15 +2381,16 @@ def _parse_bill_text(text: str) -> List[Dict[str, Any]]:
     colon_pattern = r'^(.+?)\s*[:]\s*(\d+\.?\d*)\s*$'
     # Pattern 2: Item Name Price (e.g., "Milk 1.15")
     space_price_pattern = r'^(.+?)\s+(\d+\.?\d{2})\s*$'
-    # Pattern 3: Item Name $Price (e.g., "Milk $1.15")
-    dollar_pattern = r'^(.+?)\s+\$(\d+\.?\d*)\s*$'
+    # Pattern 3: Item Name $Price or ₹Price (e.g., "Milk $1.15" or "Milk ₹50.00")
+    dollar_pattern = r'^(.+?)\s+[$\₹](\d+\.?\d*)\s*$'
     # Pattern 4: Item Name with quantity (e.g., "Cherry Tomatoes 1lb: 1.29")
     quantity_pattern = r'(\d+\.?\d*)\s*(kg|g|gm|grams?|lb|lbs|oz|ml|l|liters?|pcs?|pieces?|nos?|numbers?|pk|pack|each|ea|ct|count)'
     # Pattern 5: Item with quantity and price (e.g., "2x Milk 1.15" or "2 @ 1.15")
     qty_price_pattern = r'(\d+)\s*[xX@]\s*(.+?)\s+(\d+\.?\d*)'
     
     # Pattern for Indian receipt format: HSN code at start (e.g., "190590 MODERN MILK")
-    hsn_pattern = r'^\d{6}\s+(.+?)\s+(\d+\.?\d*)\s*$'
+    # Also handle format with ₹ symbol: "190590 MODERN MILK ₹50.00"
+    hsn_pattern = r'^\d{6}\s+(.+?)\s+[₹]?(\d+\.?\d*)\s*$'
     
     for line in lines:
         line = line.strip()
@@ -2379,7 +2504,7 @@ def _parse_bill_text(text: str) -> List[Dict[str, Any]]:
                     except ValueError:
                         pass
                 else:
-                    # Try dollar sign format (Item Name $Price)
+                    # Try dollar sign or rupee format (Item Name $Price or Item Name ₹Price)
                     dollar_match = re.match(dollar_pattern, line)
                     if dollar_match:
                         item_name = dollar_match.group(1).strip()
@@ -2388,9 +2513,9 @@ def _parse_bill_text(text: str) -> List[Dict[str, Any]]:
                         except ValueError:
                             pass
                     else:
-                        # Try space-separated format (Item Name Price)
+                        # Try space-separated format (Item Name Price or Item Name ₹Price)
                         # Look for price at the end (usually 2 decimal places)
-                        space_match = re.match(r'^(.+?)\s+(\d+\.\d{2})\s*$', line)
+                        space_match = re.match(r'^(.+?)\s+[₹]?(\d+\.\d{2})\s*$', line)
                         if space_match:
                             item_name = space_match.group(1).strip()
                             try:
@@ -2398,8 +2523,8 @@ def _parse_bill_text(text: str) -> List[Dict[str, Any]]:
                             except ValueError:
                                 pass
                         else:
-                            # Try format with single decimal (Item Name 1.5)
-                            space_match_single = re.match(r'^(.+?)\s+(\d+\.\d{1})\s*$', line)
+                            # Try format with single decimal (Item Name 1.5 or Item Name ₹1.5)
+                            space_match_single = re.match(r'^(.+?)\s+[₹]?(\d+\.\d{1})\s*$', line)
                             if space_match_single:
                                 item_name = space_match_single.group(1).strip()
                                 try:
@@ -2407,23 +2532,37 @@ def _parse_bill_text(text: str) -> List[Dict[str, Any]]:
                                 except ValueError:
                                     pass
                             else:
-                                # Fallback: find any number at the end as price
-                                # Look for patterns like "Item 12.99" or "Item 12" (but be more careful)
-                                price_match = re.search(r'(\d+\.\d{1,2})\s*$', line)  # Prefer decimal prices
-                                if not price_match:
-                                    price_match = re.search(r'(\d+)\s*$', line)  # Fallback to integer
-                                
-                                if price_match:
-                                    item_text = line[:price_match.start()].strip()
-                                    # Only use if the number looks like a price (has decimal or reasonable value)
+                                # Try Indian format: Item Name with price at end (₹50 or 50.00)
+                                # Pattern: text followed by optional ₹ and number
+                                indian_price_match = re.search(r'(.+?)\s+[₹]?(\d+\.?\d*)\s*$', line)
+                                if indian_price_match:
+                                    item_text = indian_price_match.group(1).strip()
                                     try:
-                                        potential_price = float(price_match.group(1))
+                                        potential_price = float(indian_price_match.group(2))
                                         # More lenient price range for grocery items
                                         if potential_price > 0 and potential_price < 10000:
                                             item_name = item_text
                                             price = potential_price
                                     except ValueError:
                                         pass
+                                else:
+                                    # Fallback: find any number at the end as price
+                                    # Look for patterns like "Item 12.99" or "Item 12" (but be more careful)
+                                    price_match = re.search(r'[₹]?(\d+\.\d{1,2})\s*$', line)  # Prefer decimal prices
+                                    if not price_match:
+                                        price_match = re.search(r'[₹]?(\d+)\s*$', line)  # Fallback to integer
+                                    
+                                    if price_match:
+                                        item_text = line[:price_match.start()].strip()
+                                        # Only use if the number looks like a price (has decimal or reasonable value)
+                                        try:
+                                            potential_price = float(price_match.group(1))
+                                            # More lenient price range for grocery items
+                                            if potential_price > 0 and potential_price < 10000:
+                                                item_name = item_text
+                                                price = potential_price
+                                        except ValueError:
+                                            pass
         
         if not item_name or not price or price <= 0:
             continue
