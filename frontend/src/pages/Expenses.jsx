@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import api from '../utils/api'
 import { format } from 'date-fns'
@@ -14,6 +14,7 @@ export default function Expenses() {
   const { user } = useAuth()
   const [expenses, setExpenses] = useState([])
   const [loading, setLoading] = useState(true)
+  const [settings, setSettings] = useState(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingExpense, setEditingExpense] = useState(null)
   const [formData, setFormData] = useState({
@@ -21,8 +22,8 @@ export default function Expenses() {
     description: '',
   })
 
-  // Define the three persons (case-insensitive matching)
-  const persons = ['Dinesh', 'Harsha', 'Srinivas']
+  // Get persons from settings (fallback to empty array if not loaded yet)
+  const persons = settings?.persons || []
   const loggedInPerson = user?.display_name || ''
   // Case-insensitive check: find the matching person from the list
   const matchedPerson = persons.find(p => p.toLowerCase() === loggedInPerson.toLowerCase())
@@ -32,6 +33,7 @@ export default function Expenses() {
 
   useEffect(() => {
     fetchExpenses()
+    fetchSettings()
   }, [])
 
   const fetchExpenses = async () => {
@@ -42,6 +44,15 @@ export default function Expenses() {
       console.error('Error fetching expenses:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchSettings = async () => {
+    try {
+      const response = await api.get('/settings')
+      setSettings(response.data)
+    } catch (error) {
+      console.error('Error fetching settings:', error)
     }
   }
 
@@ -110,6 +121,22 @@ export default function Expenses() {
   const getTotalForPerson = (person) => {
     return getExpensesForPerson(person).reduce((sum, e) => sum + e.amount, 0)
   }
+
+  // Get all unique person names from expenses and merge with settings persons
+  const allPersons = useMemo(() => {
+    const expensePersons = [...new Set(expenses.map(e => e.person))]
+    const settingsPersons = persons || []
+    // Merge and deduplicate (case-insensitive)
+    const merged = [...new Set([...settingsPersons, ...expensePersons])]
+    // Sort: settings persons first, then others
+    return merged.sort((a, b) => {
+      const aInSettings = settingsPersons.some(p => p.toLowerCase() === a.toLowerCase())
+      const bInSettings = settingsPersons.some(p => p.toLowerCase() === b.toLowerCase())
+      if (aInSettings && !bInSettings) return -1
+      if (!aInSettings && bInSettings) return 1
+      return a.localeCompare(b)
+    })
+  }, [expenses, persons])
 
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0)
 
@@ -221,25 +248,27 @@ export default function Expenses() {
         )}
       </AnimatePresence>
 
-      {/* Three Person Boxes */}
+      {/* Person Boxes */}
       <ScrollReveal>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {persons.map((person, index) => {
+          {allPersons.map((person, index) => {
           const personExpenses = getExpensesForPerson(person)
           const personTotal = getTotalForPerson(person)
           const isLoggedInPerson = person.toLowerCase() === loggedInPerson.toLowerCase()
           
-          // Assign different vibrant colors to each person
-          const colorClasses = [
-            'bg-gradient-to-br from-accent-indigo/40 via-accent-violet/40 to-accent-fuchsia/40 dark:from-accent-indigo/50 dark:via-accent-violet/50 dark:to-accent-fuchsia/50 border-2 sm:border-4 border-accent-indigo/60',
-            'bg-gradient-to-br from-accent-emerald/40 via-accent-teal/40 to-accent-cyan/40 dark:from-accent-emerald/50 dark:via-accent-teal/50 dark:to-accent-cyan/50 border-2 sm:border-4 border-accent-emerald/60',
-            'bg-gradient-to-br from-accent-rose/40 via-accent-pink/40 to-accent-fuchsia/40 dark:from-accent-rose/50 dark:via-accent-pink/50 dark:to-accent-fuchsia/50 border-2 sm:border-4 border-accent-rose/60',
+          // Assign different vibrant colors to each person (cycle through colors if more than 3)
+          const colorPalettes = [
+            { bg: 'bg-gradient-to-br from-accent-indigo/40 via-accent-violet/40 to-accent-fuchsia/40 dark:from-accent-indigo/50 dark:via-accent-violet/50 dark:to-accent-fuchsia/50', border: 'border-2 sm:border-4 border-accent-indigo/60', text: 'from-accent-indigo via-accent-violet to-accent-fuchsia' },
+            { bg: 'bg-gradient-to-br from-accent-emerald/40 via-accent-teal/40 to-accent-cyan/40 dark:from-accent-emerald/50 dark:via-accent-teal/50 dark:to-accent-cyan/50', border: 'border-2 sm:border-4 border-accent-emerald/60', text: 'from-accent-emerald via-accent-teal to-accent-cyan' },
+            { bg: 'bg-gradient-to-br from-accent-rose/40 via-accent-pink/40 to-accent-fuchsia/40 dark:from-accent-rose/50 dark:via-accent-pink/50 dark:to-accent-fuchsia/50', border: 'border-2 sm:border-4 border-accent-rose/60', text: 'from-accent-rose via-accent-pink to-accent-fuchsia' },
+            { bg: 'bg-gradient-to-br from-accent-sky/40 via-accent-blue/40 to-accent-indigo/40 dark:from-accent-sky/50 dark:via-accent-blue/50 dark:to-accent-indigo/50', border: 'border-2 sm:border-4 border-accent-sky/60', text: 'from-accent-sky via-accent-blue to-accent-indigo' },
+            { bg: 'bg-gradient-to-br from-accent-yellow/40 via-accent-amber/40 to-accent-orange/40 dark:from-accent-yellow/50 dark:via-accent-amber/50 dark:to-accent-orange/50', border: 'border-2 sm:border-4 border-accent-yellow/60', text: 'from-accent-yellow via-accent-amber to-accent-orange' },
+            { bg: 'bg-gradient-to-br from-accent-purple/40 via-accent-violet/40 to-accent-fuchsia/40 dark:from-accent-purple/50 dark:via-accent-violet/50 dark:to-accent-fuchsia/50', border: 'border-2 sm:border-4 border-accent-purple/60', text: 'from-accent-purple via-accent-violet to-accent-fuchsia' },
           ]
-          const textGradients = [
-            'from-accent-indigo via-accent-violet to-accent-fuchsia',
-            'from-accent-emerald via-accent-teal to-accent-cyan',
-            'from-accent-rose via-accent-pink to-accent-fuchsia',
-          ]
+          const colorIndex = index % colorPalettes.length
+          const colorClass = colorPalettes[colorIndex].bg
+          const borderClass = colorPalettes[colorIndex].border
+          const textGradient = colorPalettes[colorIndex].text
 
           return (
             <motion.div
@@ -248,12 +277,12 @@ export default function Expenses() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.1 }}
               whileHover={{ scale: 1.02, boxShadow: "0 12px 24px rgba(0, 0, 0, 0.2)" }}
-              className={`${colorClasses[index]} dark:bg-gradient-to-br light:bg-gradient-to-br rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 ${
+              className={`${colorClass} ${borderClass} dark:bg-gradient-to-br light:bg-gradient-to-br rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 ${
                 isLoggedInPerson ? 'ring-2 sm:ring-4 ring-accent-yellow/50 shadow-accent-yellow/30' : ''
               }`}
             >
               <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <h2 className={`text-xl sm:text-2xl lg:text-3xl font-extrabold bg-gradient-to-r ${textGradients[index]} bg-clip-text text-transparent`}>{person}</h2>
+                <h2 className={`text-xl sm:text-2xl lg:text-3xl font-extrabold bg-gradient-to-r ${textGradient} bg-clip-text text-transparent`}>{person}</h2>
                 {isLoggedInPerson && (
                   <span className="text-xs px-2 sm:px-3 py-1 sm:py-1.5 bg-gradient-to-r from-accent-yellow via-accent-amber to-accent-orange text-white rounded-full font-extrabold shadow-lg">
                     You
@@ -263,7 +292,7 @@ export default function Expenses() {
               
               <div className="mb-3 sm:mb-4 pb-3 sm:pb-4 border-b-2 dark:border-dark-border light:border-light-border">
                 <p className="text-xs sm:text-sm font-bold dark:text-dark-text-secondary light:text-light-text-secondary mb-1">Total</p>
-                <p className={`text-2xl sm:text-3xl lg:text-4xl font-extrabold bg-gradient-to-r ${textGradients[index]} bg-clip-text text-transparent`}>₹{personTotal.toFixed(2)}</p>
+                <p className={`text-2xl sm:text-3xl lg:text-4xl font-extrabold bg-gradient-to-r ${textGradient} bg-clip-text text-transparent`}>₹{personTotal.toFixed(2)}</p>
               </div>
 
               {personExpenses.length === 0 ? (
@@ -277,19 +306,15 @@ export default function Expenses() {
                       <AnimatedCard
                         key={expense.id}
                         delay={expenseIdx * 0.03}
-                        className={`p-3 sm:p-4 border-2 ${
-                          index === 0 ? 'border-accent-indigo/40 dark:border-accent-indigo/50' :
-                          index === 1 ? 'border-accent-emerald/40 dark:border-accent-emerald/50' :
-                          'border-accent-rose/40 dark:border-accent-rose/50'
-                        }`}
+                        className={`p-3 sm:p-4 ${borderClass.replace('border-2 sm:border-4', 'border-2').replace('/60', '/40 dark:border-opacity-50')}`}
                       >
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
-                            <p className={`text-xs sm:text-sm font-extrabold bg-gradient-to-r ${textGradients[index]} bg-clip-text text-transparent`}>
+                            <p className={`text-xs sm:text-sm font-extrabold bg-gradient-to-r ${textGradient} bg-clip-text text-transparent`}>
                               {expense.person}
                             </p>
-                            <p className={`text-lg sm:text-xl font-extrabold bg-gradient-to-r ${textGradients[index]} bg-clip-text text-transparent`}>
+                            <p className={`text-lg sm:text-xl font-extrabold bg-gradient-to-r ${textGradient} bg-clip-text text-transparent`}>
                               ₹{expense.amount.toFixed(2)}
                             </p>
                           </div>
