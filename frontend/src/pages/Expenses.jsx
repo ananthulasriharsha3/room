@@ -29,8 +29,9 @@ export default function Expenses() {
   const loggedInPerson = user?.display_name || ''
   // Case-insensitive check: find the matching person from the list
   const matchedPerson = persons.find(p => p.toLowerCase() === loggedInPerson.toLowerCase())
-  const canEdit = !!matchedPerson
-  // Use the matched person name (with correct capitalization) for consistency
+  // Allow any logged-in user with access to add expenses (backend uses their display_name)
+  const canEdit = !!user && user.has_access
+  // Use the matched person name (with correct capitalization) for consistency, or fallback to display_name
   const loggedInPersonFormatted = matchedPerson || loggedInPerson
 
   useEffect(() => {
@@ -61,7 +62,7 @@ export default function Expenses() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!canEdit || submitting) {
-      if (!canEdit) alert('You can only add expenses for your own account')
+      if (!canEdit) alert('You need access to add expenses. Please contact an admin.')
       return
     }
     
