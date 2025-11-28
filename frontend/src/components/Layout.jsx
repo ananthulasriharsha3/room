@@ -55,7 +55,7 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen dark:bg-dark-bg light:bg-light-bg flex flex-col w-full max-w-full overflow-x-hidden">
+    <div className="h-screen dark:bg-dark-bg light:bg-light-bg flex flex-col w-full max-w-full overflow-x-hidden overflow-y-hidden">
       {/* Top Navigation Bar */}
       <motion.nav 
         className={`w-full dark:bg-gradient-to-r dark:from-dark-surface dark:to-dark-card light:bg-gradient-to-r light:from-light-surface light:to-light-card border-b dark:border-dark-border light:border-light-border sticky top-0 z-[60] transition-all duration-300 ${
@@ -123,7 +123,7 @@ export default function Layout() {
         </div>
       </motion.nav>
 
-      <div className="flex flex-1 overflow-hidden relative w-full max-w-full">
+      <div className="flex flex-1 relative w-full max-w-full overflow-hidden">
         {/* Mobile Sidebar Overlay */}
         {sidebarOpen && (
           <div
@@ -143,7 +143,7 @@ export default function Layout() {
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           pt-16 lg:pt-0
         `}>
-          <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          <nav className="flex-1 p-4 space-y-2 overflow-y-visible">
             {navigation.map((item, index) => {
               const isActive = location.pathname === item.path
               const IconComponent = item.icon
