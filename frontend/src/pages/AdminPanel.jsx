@@ -54,9 +54,13 @@ export default function AdminPanel() {
     }
   }
 
-  const handleToggleAccess = async (userId) => {
+  const handleToggleAccess = async (userId, currentAccess) => {
     try {
-      await api.post(`/admin/users/${userId}/access`)
+      // Toggle the access: if currently has access, revoke it; otherwise grant it
+      const newAccess = !currentAccess
+      await api.post(`/admin/users/${userId}/access`, {
+        has_access: newAccess
+      })
       fetchUsers()
     } catch (error) {
       console.error('Error toggling access:', error)
@@ -188,7 +192,7 @@ export default function AdminPanel() {
                 </div>
                 {!u.is_admin && (
                   <button
-                    onClick={() => handleToggleAccess(u.id)}
+                    onClick={() => handleToggleAccess(u.id, u.has_access)}
                     className={`w-full sm:w-auto px-3 sm:px-4 py-2 text-xs sm:text-sm rounded-lg sm:rounded-xl font-semibold transition-colors ${
                       u.has_access
                         ? 'bg-yellow-900/20 border border-yellow-500 text-yellow-200 hover:bg-yellow-900/30'
