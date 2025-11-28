@@ -10,6 +10,10 @@ export default function ShoppingItems() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [newItemName, setNewItemName] = useState('')
   const [settings, setSettings] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [votingIds, setVotingIds] = useState(new Set())
+  const [completingIds, setCompletingIds] = useState(new Set())
+  const [deletingIds, setDeletingIds] = useState(new Set())
 
   useEffect(() => {
     fetchItems()
@@ -38,48 +42,147 @@ export default function ShoppingItems() {
 
   const handleAddItem = async (e) => {
     e.preventDefault()
-    if (!newItemName.trim()) return
+    if (!newItemName.trim() || submitting) return
+
+    setSubmitting(true)
+    const itemName = newItemName.trim()
+    setNewItemName('')
+    
+    // Optimistic update
+    const tempId = Date.now()
+    const optimisticItem = {
+      id: tempId,
+      name: itemName,
+      votes: {},
+      total_votes: 0,
+      is_completed: false,
+      created_at: new Date().toISOString(),
+      created_by: user?.display_name || '',
+    }
+    setItems(prev => [optimisticItem, ...prev])
 
     try {
-      await api.post('/shopping-items', { name: newItemName.trim() })
-      setNewItemName('')
+      const response = await api.post('/shopping-items', { name: itemName })
+      // Replace optimistic update with real data
+      setItems(prev => {
+        const filtered = prev.filter(item => item.id !== tempId)
+        return [response.data, ...filtered]
+      })
       setShowAddForm(false)
-      fetchItems()
     } catch (error) {
       console.error('Error adding item:', error)
+      // Revert optimistic update
+      setItems(prev => prev.filter(item => item.id !== tempId))
+      setNewItemName(itemName)
       alert(error.response?.data?.detail || 'Failed to add item')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   const handleVote = async (itemId, person) => {
+    if (votingIds.has(itemId)) return
+    
+    setVotingIds(prev => new Set(prev).add(itemId))
+    
+    // Optimistic update
+    const item = items.find(i => i.id === itemId)
+    if (item) {
+      const hadVote = item.votes[person] || false
+      setItems(prev => prev.map(i => 
+        i.id === itemId 
+          ? { 
+              ...i, 
+              votes: { ...i.votes, [person]: !hadVote },
+              total_votes: hadVote ? i.total_votes - 1 : i.total_votes + 1
+            }
+          : i
+      ))
+    }
+
     try {
       await api.post(`/shopping-items/${itemId}/vote`, { person })
-      fetchItems()
+      fetchItems() // Refresh to get accurate state
     } catch (error) {
       console.error('Error voting:', error)
+      // Revert optimistic update
+      if (item) {
+        setItems(prev => prev.map(i => 
+          i.id === itemId ? item : i
+        ))
+      }
       alert(error.response?.data?.detail || 'Failed to vote')
+    } finally {
+      setVotingIds(prev => {
+        const next = new Set(prev)
+        next.delete(itemId)
+        return next
+      })
     }
   }
 
   const handleComplete = async (itemId) => {
+    if (completingIds.has(itemId)) return
+    
+    setCompletingIds(prev => new Set(prev).add(itemId))
+    
+    // Optimistic update
+    const item = items.find(i => i.id === itemId)
+    if (item) {
+      setItems(prev => prev.map(i => 
+        i.id === itemId ? { ...i, is_completed: !i.is_completed } : i
+      ))
+    }
+
     try {
       await api.post(`/shopping-items/${itemId}/complete`)
-      fetchItems()
+      fetchItems() // Refresh to get accurate state
     } catch (error) {
       console.error('Error completing item:', error)
+      // Revert optimistic update
+      if (item) {
+        setItems(prev => prev.map(i => 
+          i.id === itemId ? item : i
+        ))
+      }
       alert(error.response?.data?.detail || 'Failed to complete item')
+    } finally {
+      setCompletingIds(prev => {
+        const next = new Set(prev)
+        next.delete(itemId)
+        return next
+      })
     }
   }
 
   const handleDelete = async (itemId) => {
     if (!confirm('Are you sure you want to delete this item?')) return
 
+    // Optimistic update
+    const itemToDelete = items.find(i => i.id === itemId)
+    setItems(prev => prev.filter(i => i.id !== itemId))
+    setDeletingIds(prev => new Set(prev).add(itemId))
+
     try {
       await api.delete(`/shopping-items/${itemId}`)
-      fetchItems()
     } catch (error) {
       console.error('Error deleting item:', error)
+      // Revert optimistic update
+      if (itemToDelete) {
+        setItems(prev => [...prev, itemToDelete].sort((a, b) => {
+          if (b.total_votes !== a.total_votes) {
+            return b.total_votes - a.total_votes
+          }
+          return new Date(b.created_at) - new Date(a.created_at)
+        }))
+      }
       alert(error.response?.data?.detail || 'Failed to delete item')
+    } finally {
+      setDeletingIds(prev => {
+        const next = new Set(prev)
+        next.delete(itemId)
+        return next
+      })
     }
   }
 
@@ -139,9 +242,17 @@ export default function ShoppingItems() {
             />
             <button
               type="submit"
-              className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-accent-violet via-accent-fuchsia to-accent-rose text-white font-semibold rounded-lg sm:rounded-xl hover:shadow-lg hover:shadow-accent-violet/30 hover:scale-105 transition-all"
+              disabled={submitting}
+              className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-accent-violet via-accent-fuchsia to-accent-rose text-white font-semibold rounded-lg sm:rounded-xl hover:shadow-lg hover:shadow-accent-violet/30 hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              Add
+              {submitting ? (
+                <span className="flex items-center gap-2">
+                  <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                  Adding...
+                </span>
+              ) : (
+                'Add'
+              )}
             </button>
           </form>
         </div>
@@ -196,7 +307,8 @@ export default function ShoppingItems() {
                         <button
                           key={person}
                           onClick={() => handleVote(item.id, person)}
-                          className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all ${
+                          disabled={votingIds.has(item.id)}
+                          className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                             voteCount > 0
                               ? 'dark:bg-white dark:text-black light:bg-light-text light:text-light-surface shadow-soft'
                               : 'dark:bg-dark-surface light:bg-light-surface dark:text-dark-text-secondary light:text-light-text-secondary hover:dark:bg-white hover:dark:text-black hover:light:bg-light-text hover:light:text-light-surface'
@@ -210,15 +322,31 @@ export default function ShoppingItems() {
                   <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
                     <button
                       onClick={() => handleComplete(item.id)}
-                      className="w-full sm:w-auto px-3 sm:px-4 py-2 text-xs sm:text-sm bg-green-500/10 border border-green-500 dark:text-green-300 light:text-green-600 rounded-lg sm:rounded-xl hover:bg-green-500/20 transition-colors font-medium"
+                      disabled={completingIds.has(item.id)}
+                      className="w-full sm:w-auto px-3 sm:px-4 py-2 text-xs sm:text-sm bg-green-500/10 border border-green-500 dark:text-green-300 light:text-green-600 rounded-lg sm:rounded-xl hover:bg-green-500/20 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Complete
+                      {completingIds.has(item.id) ? (
+                        <span className="flex items-center gap-2 justify-center">
+                          <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                          Updating...
+                        </span>
+                      ) : (
+                        'Complete'
+                      )}
                     </button>
                     <button
                       onClick={() => handleDelete(item.id)}
-                      className="w-full sm:w-auto px-3 sm:px-4 py-2 text-xs sm:text-sm bg-red-500/10 border border-red-500 dark:text-red-300 light:text-red-600 rounded-lg sm:rounded-xl hover:bg-red-500/20 transition-colors font-medium"
+                      disabled={deletingIds.has(item.id)}
+                      className="w-full sm:w-auto px-3 sm:px-4 py-2 text-xs sm:text-sm bg-red-500/10 border border-red-500 dark:text-red-300 light:text-red-600 rounded-lg sm:rounded-xl hover:bg-red-500/20 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Delete
+                      {deletingIds.has(item.id) ? (
+                        <span className="flex items-center gap-2 justify-center">
+                          <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                          Deleting...
+                        </span>
+                      ) : (
+                        'Delete'
+                      )}
                     </button>
                   </div>
                 </div>
@@ -247,9 +375,17 @@ export default function ShoppingItems() {
                   </div>
                   <button
                     onClick={() => handleDelete(item.id)}
-                    className="w-full sm:w-auto px-3 sm:px-4 py-1.5 sm:py-2 bg-red-500/10 border border-red-500 dark:text-red-300 light:text-red-600 rounded-lg sm:rounded-xl hover:bg-red-500/20 transition-colors text-xs sm:text-sm font-medium"
+                    disabled={deletingIds.has(item.id)}
+                    className="w-full sm:w-auto px-3 sm:px-4 py-1.5 sm:py-2 bg-red-500/10 border border-red-500 dark:text-red-300 light:text-red-600 rounded-lg sm:rounded-xl hover:bg-red-500/20 transition-colors text-xs sm:text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Delete
+                    {deletingIds.has(item.id) ? (
+                      <span className="flex items-center gap-2 justify-center">
+                        <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                        Deleting...
+                      </span>
+                    ) : (
+                      'Delete'
+                    )}
                   </button>
                 </div>
               </div>

@@ -21,6 +21,8 @@ export default function Expenses() {
     amount: '',
     description: '',
   })
+  const [submitting, setSubmitting] = useState(false)
+  const [deletingIds, setDeletingIds] = useState(new Set())
 
   // Get persons from settings (fallback to empty array if not loaded yet)
   const persons = settings?.persons || []
@@ -58,9 +60,28 @@ export default function Expenses() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!canEdit) {
-      alert('You can only add expenses for your own account')
+    if (!canEdit || submitting) {
+      if (!canEdit) alert('You can only add expenses for your own account')
       return
+    }
+    
+    setSubmitting(true)
+    const expenseData = {
+      person: loggedInPersonFormatted,
+      amount: parseFloat(formData.amount),
+      description: formData.description,
+    }
+    
+    // Optimistic update: add expense immediately
+    let tempId = null
+    if (!editingExpense) {
+      tempId = Date.now()
+      const optimisticExpense = {
+        id: tempId,
+        ...expenseData,
+        timestamp: new Date().toISOString(),
+      }
+      setExpenses(prev => [optimisticExpense, ...prev].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)))
     }
     
     try {
@@ -69,18 +90,30 @@ export default function Expenses() {
         await api.delete(`/expenses/${editingExpense.id}`)
       }
       
-      await api.post('/expenses', {
-        person: loggedInPersonFormatted,
-        amount: parseFloat(formData.amount),
-        description: formData.description,
-      })
+      const response = await api.post('/expenses', expenseData)
+      
+      // Replace optimistic update with real data
+      if (!editingExpense && tempId) {
+        setExpenses(prev => {
+          const filtered = prev.filter(e => e.id !== tempId)
+          return [response.data, ...filtered].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        })
+      } else {
+        fetchExpenses()
+      }
+      
       setFormData({ amount: '', description: '' })
       setShowAddForm(false)
       setEditingExpense(null)
-      fetchExpenses()
     } catch (error) {
       console.error('Error saving expense:', error)
+      // Revert optimistic update on error
+      if (!editingExpense && tempId) {
+        setExpenses(prev => prev.filter(e => e.id !== tempId))
+      }
       alert(error.response?.data?.detail || 'Failed to save expense')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -105,12 +138,26 @@ export default function Expenses() {
     
     if (!confirm('Are you sure you want to delete this expense?')) return
     
+    // Optimistic update: remove immediately
+    const expenseToDelete = expenses.find(e => e.id === id)
+    setExpenses(prev => prev.filter(e => e.id !== id))
+    setDeletingIds(prev => new Set(prev).add(id))
+    
     try {
       await api.delete(`/expenses/${id}`)
-      fetchExpenses()
     } catch (error) {
       console.error('Error deleting expense:', error)
+      // Revert optimistic update on error
+      if (expenseToDelete) {
+        setExpenses(prev => [...prev, expenseToDelete].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)))
+      }
       alert(error.response?.data?.detail || 'Failed to delete expense')
+    } finally {
+      setDeletingIds(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
     }
   }
 
@@ -230,9 +277,17 @@ export default function Expenses() {
               <AnimatedButton
                 type="submit"
                 variant="success"
-                className="flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base"
+                disabled={submitting}
+                className="flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {editingExpense ? 'Update Expense' : 'Add Expense'}
+                {submitting ? (
+                  <span className="flex items-center gap-2">
+                    <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                    {editingExpense ? 'Updating...' : 'Adding...'}
+                  </span>
+                ) : (
+                  editingExpense ? 'Update Expense' : 'Add Expense'
+                )}
               </AnimatedButton>
               <AnimatedButton
                 type="button"
@@ -340,12 +395,17 @@ export default function Expenses() {
                             </motion.button>
                             <motion.button
                               onClick={() => handleDelete(expense.id, expense.person)}
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.95 }}
-                              className="p-2 sm:p-2.5 bg-gradient-to-br from-accent-red to-accent-rose text-white rounded-lg shadow-lg shadow-accent-red/30 transition-all"
+                              disabled={deletingIds.has(expense.id)}
+                              whileHover={{ scale: deletingIds.has(expense.id) ? 1 : 1.1 }}
+                              whileTap={{ scale: deletingIds.has(expense.id) ? 1 : 0.95 }}
+                              className="p-2 sm:p-2.5 bg-gradient-to-br from-accent-red to-accent-rose text-white rounded-lg shadow-lg shadow-accent-red/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Delete expense"
                             >
-                              <FaTrash className="w-3 h-3 sm:w-4 sm:h-4" />
+                              {deletingIds.has(expense.id) ? (
+                                <span className="inline-block w-3 h-3 sm:w-4 sm:h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                              ) : (
+                                <FaTrash className="w-3 h-3 sm:w-4 sm:h-4" />
+                              )}
                             </motion.button>
                           </div>
                         )}
