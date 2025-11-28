@@ -1905,7 +1905,7 @@ def list_users(admin: UserPublic = Depends(get_current_admin)) -> List[UserListR
                 created_at=_parse_timestamp(record.get("created_at", datetime.now(timezone.utc).isoformat())),
             )
         )
-        return users
+    return users
 
 
 @app.get("/stock-items", response_model=List[StockItemResponse])
