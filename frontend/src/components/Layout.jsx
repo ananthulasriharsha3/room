@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -25,15 +25,6 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [scrolled, setScrolled] = useState(false)
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20)
-    }
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
 
   const navigation = [
     { name: 'Dashboard', path: '/dashboard', icon: FaChartBar },
@@ -58,14 +49,7 @@ export default function Layout() {
     <div className="h-screen dark:bg-dark-bg light:bg-light-bg flex flex-col w-full max-w-full overflow-x-hidden overflow-y-hidden">
       {/* Top Navigation Bar */}
       <motion.nav 
-        className={`w-full dark:bg-gradient-to-r dark:from-dark-surface dark:to-dark-card light:bg-gradient-to-r light:from-light-surface light:to-light-card border-b dark:border-dark-border light:border-light-border sticky top-0 z-[60] transition-all duration-300 ${
-          scrolled ? 'shadow-xl backdrop-blur-md py-2 sm:py-3' : 'shadow-lg py-3 sm:py-4'
-        }`}
-        initial={false}
-        animate={{
-          boxShadow: scrolled ? '0 8px 24px rgba(0, 0, 0, 0.2)' : '0 4px 12px rgba(0, 0, 0, 0.1)',
-        }}
-        transition={{ duration: 0.3 }}
+        className="w-full dark:bg-gradient-to-r dark:from-dark-surface dark:to-dark-card light:bg-gradient-to-r light:from-light-surface light:to-light-card border-b dark:border-dark-border light:border-light-border sticky top-0 z-[60] transition-all duration-300 shadow-lg py-3 sm:py-4"
       >
         <div className="px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3 sm:space-x-6">
@@ -135,15 +119,16 @@ export default function Layout() {
         {/* Sidebar */}
         <aside className={`
           fixed lg:static left-0 z-50
-          top-0 lg:top-0 bottom-0
+          top-0 lg:top-0 h-full lg:h-auto
           w-64 dark:bg-dark-surface light:bg-light-surface 
           border-r dark:border-dark-border light:border-light-border 
           flex flex-col shadow-medium
           transform transition-transform duration-300 ease-in-out
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           pt-16 lg:pt-0
+          overflow-hidden
         `}>
-          <nav className="flex-1 p-4 space-y-2 overflow-y-visible">
+          <nav className="flex-1 p-4 space-y-2 overflow-hidden">
             {navigation.map((item, index) => {
               const isActive = location.pathname === item.path
               const IconComponent = item.icon
@@ -173,11 +158,9 @@ export default function Layout() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden w-full min-w-0 max-w-full">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden w-full min-w-0 max-w-full h-full">
           <div className="p-4 sm:p-6 lg:p-8 mx-auto w-full box-border" style={{ maxWidth: 'min(100%, 1280px)' }}>
-            <div className="w-full overflow-x-hidden box-border" style={{ maxWidth: '100%' }}>
-              <Outlet />
-            </div>
+            <Outlet />
           </div>
         </main>
       </div>

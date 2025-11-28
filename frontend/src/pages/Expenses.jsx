@@ -355,7 +355,7 @@ export default function Expenses() {
                   No expenses yet
                 </p>
               ) : (
-                <div className="space-y-2 sm:space-y-3 max-h-96 overflow-y-auto">
+                <div className="space-y-2 sm:space-y-3">
                   <AnimatePresence>
                     {personExpenses.map((expense, expenseIdx) => (
                       <AnimatedCard
