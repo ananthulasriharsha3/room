@@ -1,9 +1,32 @@
 import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect } from 'react'
 import { useReducedMotion } from '../hooks/useReducedMotion'
 import { FaTimes } from 'react-icons/fa'
 
 export function AnimatedModal({ isOpen, onClose, children, title, className = '' }) {
   const prefersReducedMotion = useReducedMotion()
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      // Save current scroll position
+      const scrollY = window.scrollY
+      // Prevent scrolling on body
+      document.body.style.position = 'fixed'
+      document.body.style.top = `-${scrollY}px`
+      document.body.style.width = '100%'
+      document.body.style.overflow = 'hidden'
+      
+      return () => {
+        // Restore scrolling when modal closes
+        document.body.style.position = ''
+        document.body.style.top = ''
+        document.body.style.width = ''
+        document.body.style.overflow = ''
+        window.scrollTo(0, scrollY)
+      }
+    }
+  }, [isOpen])
 
   const backdropVariants = prefersReducedMotion
     ? { opacity: 1 }
@@ -34,31 +57,42 @@ export function AnimatedModal({ isOpen, onClose, children, title, className = ''
             className="fixed inset-0 dark:bg-black/60 light:bg-black/70 z-50 backdrop-blur-sm"
             onClick={onClose}
           />
-          <motion.div
-            variants={modalVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-xl sm:rounded-2xl shadow-2xl p-4 sm:p-6 ${className}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {title && (
-              <div className="flex items-center justify-between mb-4 sm:mb-6">
-                <h2 className="text-lg sm:text-xl lg:text-2xl font-bold dark:text-dark-text light:text-light-text">
-                  {title}
-                </h2>
-                <button
-                  onClick={onClose}
-                  className="p-2 rounded-lg dark:bg-dark-card light:bg-light-card dark:text-dark-text light:text-light-text hover:opacity-80 transition-opacity"
-                  aria-label="Close"
-                >
-                  <FaTimes className="w-5 h-5" />
-                </button>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 pointer-events-none">
+            <motion.div
+              variants={modalVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className={`w-full max-w-md max-h-[calc(100vh-2rem)] sm:max-h-[90vh] dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-xl sm:rounded-2xl shadow-2xl flex flex-col pointer-events-auto ${className}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {title && (
+                <div className="flex items-center justify-between p-3 sm:p-4 lg:p-6 pb-2 sm:pb-3 flex-shrink-0 border-b dark:border-dark-border light:border-light-border">
+                  <h2 className="text-base sm:text-lg lg:text-xl xl:text-2xl font-bold dark:text-dark-text light:text-light-text pr-2">
+                    {title}
+                  </h2>
+                  <button
+                    onClick={onClose}
+                    className="p-1.5 sm:p-2 rounded-lg dark:bg-dark-card light:bg-light-card dark:text-dark-text light:text-light-text hover:opacity-80 transition-opacity flex-shrink-0"
+                    aria-label="Close"
+                  >
+                    <FaTimes className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </button>
+                </div>
+              )}
+              <div 
+                className="overflow-y-auto overflow-x-hidden flex-1 min-h-0 p-3 sm:p-4 lg:p-6"
+                style={{
+                  WebkitOverflowScrolling: 'touch',
+                  overscrollBehavior: 'contain',
+                  scrollbarWidth: 'thin'
+                }}
+              >
+                {children}
               </div>
-            )}
-            {children}
-          </motion.div>
+            </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>

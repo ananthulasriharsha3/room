@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -11,9 +11,16 @@ export default function Register() {
   const [displayName, setDisplayName] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { login } = useAuth()
+  const { login, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
+
+  // Navigate to dashboard when user is set (after successful registration)
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [user, navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -29,10 +36,9 @@ export default function Register() {
       
       const { access_token, user } = response.data
       login(access_token, user)
-      navigate('/dashboard')
+      // Navigation will happen automatically via useEffect when user state updates
     } catch (err) {
       setError(err.response?.data?.detail || 'Registration failed. Please try again.')
-    } finally {
       setLoading(false)
     }
   }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -10,9 +10,16 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { login } = useAuth()
+  const { login, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
+
+  // Navigate to dashboard when user is set (after successful login)
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [user, navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -27,10 +34,10 @@ export default function Login() {
       
       const { access_token, user } = response.data
       login(access_token, user)
-      navigate('/dashboard')
+      // Navigation will happen automatically via useEffect when user state updates
+      // Don't set loading to false here - let the redirect happen
     } catch (err) {
       setError(err.response?.data?.detail || 'Login failed. Please try again.')
-    } finally {
       setLoading(false)
     }
   }

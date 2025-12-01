@@ -7,7 +7,6 @@ import { FaDollarSign, FaShoppingCart } from 'react-icons/fa'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import { AnimatedCard } from '../components/ui/AnimatedCard'
 import { AnimatedButton } from '../components/ui/AnimatedButton'
-import { ScrollReveal } from '../components/ui/ScrollReveal'
 import { SkeletonLoader } from '../components/ui/SkeletonLoader'
 
 export default function Dashboard() {
@@ -23,6 +22,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchDashboardData()
+    // Safety timeout - ensure loading doesn't stay true forever
+    const timeout = setTimeout(() => {
+      setLoading(false)
+    }, 10000) // 10 second timeout
+    
+    return () => clearTimeout(timeout)
   }, [])
 
   const handleCloseMonth = async () => {
@@ -155,33 +160,65 @@ export default function Dashboard() {
 
       const groceriesTotal = currentMonthGroceries.reduce((sum, g) => sum + g.price, 0)
 
-      // Color palette for persons - bold, trending colors
-      const personColors = {
-        'Dinesh': '#0066ff',    // Electric blue
-        'Harsha': '#8b2eff',    // Electric violet
-        'Srinivas': '#ff006e',  // Hot pink
+      // Color palette for persons - vibrant, distinct colors
+      // Use a function to match person names (case-insensitive, handles variations)
+      const getPersonColor = (personName) => {
+        const nameLower = personName.toLowerCase()
+        
+        // Color mapping with flexible matching
+        if (nameLower.includes('dinesh')) {
+          return '#0066ff'  // Electric blue
+        } else if (nameLower.includes('harsha')) {
+          return '#8b2eff'   // Electric violet
+        } else if (nameLower.includes('srinivas')) {
+          return '#00d4ff'   // Cyan
+        }
+        
+        // Default: assign colors dynamically for any other persons
+        return null
       }
+
+      // Extended color palette for additional persons
+      const additionalColors = [
+        '#00ff88',  // Neon green
+        '#ff6b00',  // Orange
+        '#00d4ff',  // Cyan
+        '#ffd700',  // Gold
+        '#ff1493',  // Deep pink
+        '#7b2cbf',  // Purple
+        '#06ffa5',  // Mint green
+        '#ff8c00',  // Dark orange
+      ]
 
       // Create pie chart data with expenses by person + groceries
       const pieChartData = []
+      let colorIndex = 0
       
       // Add each person's expenses
       Object.entries(expensesByPerson).forEach(([person, amount]) => {
         if (amount > 0) {
+          let color = getPersonColor(person)
+          
+          // If no color found, assign from additional colors
+          if (!color) {
+            color = additionalColors[colorIndex % additionalColors.length]
+            colorIndex++
+          }
+          
           pieChartData.push({
             name: person,
             value: amount,
-            color: personColors[person] || '#6b7280', // Default gray if person not in color map
+            color: color,
           })
         }
       })
 
-      // Add groceries
+      // Add groceries (use a distinct color that won't conflict with person colors)
       if (groceriesTotal > 0) {
         pieChartData.push({
           name: 'Groceries',
           value: groceriesTotal,
-          color: '#00ff88', // Neon green
+          color: '#10b981', // Emerald green (distinct from person colors)
         })
       }
 
@@ -220,61 +257,61 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 lg:space-y-8">
-      <ScrollReveal>
-        <div>
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold dark:text-dark-text light:text-light-text mb-2">Dashboard</h1>
-          <p className="text-sm sm:text-base dark:text-dark-text-secondary light:text-light-text-secondary">Overview of your room duties and expenses</p>
-        </div>
-      </ScrollReveal>
+    <div className="space-y-4 sm:space-y-6 lg:space-y-8 relative z-10 w-full">
+      <div>
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold dark:text-dark-text light:text-light-text mb-2">Dashboard</h1>
+        <p className="text-sm sm:text-base dark:text-dark-text-secondary light:text-light-text-secondary">Overview of your room duties and expenses</p>
+      </div>
 
       {/* Stats Grid */}
-      <ScrollReveal>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
           <motion.div 
-            className="bg-gradient-to-br from-accent-indigo/40 via-accent-violet/40 to-accent-fuchsia/40 dark:bg-gradient-to-br dark:from-accent-indigo/50 dark:via-accent-violet/50 dark:to-accent-fuchsia/50 border-2 sm:border-4 border-accent-indigo/60 dark:border-accent-indigo/70 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl"
+            className="bg-gradient-to-br dark:bg-gradient-to-br dark:from-accent-indigo/50 dark:via-accent-violet/50 dark:to-accent-fuchsia/50 border-2 sm:border-4 dark:border-accent-indigo/70 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl"
+            style={{ background: 'linear-gradient(to bottom right, rgba(255, 253, 250, 0.5), rgba(255, 245, 238, 0.5), rgba(255, 240, 245, 0.5))', borderColor: 'rgba(139, 69, 19, 0.4)' }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
-            whileHover={{ scale: 1.02, boxShadow: "0 12px 24px rgba(94, 58, 255, 0.3)" }}
+            whileHover={{ scale: 1.02, boxShadow: "0 12px 24px rgba(139, 69, 19, 0.3)" }}
           >
           <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <h3 className="text-accent-indigo dark:text-accent-violet text-xs sm:text-sm lg:text-base font-extrabold uppercase tracking-wide">Total Expenses</h3>
-            <div className="p-2 sm:p-4 bg-gradient-to-br from-accent-indigo via-accent-violet to-accent-fuchsia rounded-lg sm:rounded-xl shadow-xl animate-pulse">
+            <h3 className="dark:text-accent-violet text-xs sm:text-sm lg:text-base font-extrabold uppercase tracking-wide" style={{ color: '#8B4513' }}>Total Expenses</h3>
+            <div className="p-2 sm:p-4 rounded-lg sm:rounded-xl shadow-xl animate-pulse" style={{ background: 'linear-gradient(to bottom right, #8B4513, #A0522D, #CD853F)' }}>
               <FaDollarSign className="text-xl sm:text-2xl lg:text-3xl text-white" />
             </div>
           </div>
-          <p className="text-3xl sm:text-4xl lg:text-5xl font-extrabold bg-gradient-to-r from-accent-indigo via-accent-violet to-accent-fuchsia bg-clip-text text-transparent mb-2 drop-shadow-lg">₹{stats.expenses.total.toFixed(2)}</p>
+          <p className="text-3xl sm:text-4xl lg:text-5xl font-extrabold bg-clip-text text-transparent mb-2 drop-shadow-lg" style={{ backgroundImage: 'linear-gradient(to right, #8B4513, #A0522D, #CD853F)', WebkitBackgroundClip: 'text', backgroundClip: 'text' }}>₹{stats.expenses.total.toFixed(2)}</p>
           <p className="text-xs sm:text-sm font-bold dark:text-dark-text-secondary light:text-light-text-secondary">{stats.expenses.count} entries</p>
           </motion.div>
 
           <motion.div 
-            className="bg-gradient-to-br from-accent-emerald/40 via-accent-teal/40 to-accent-cyan/40 dark:bg-gradient-to-br dark:from-accent-emerald/50 dark:via-accent-teal/50 dark:to-accent-cyan/50 border-2 sm:border-4 border-accent-emerald/60 dark:border-accent-emerald/70 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl"
+            className="bg-gradient-to-br dark:bg-gradient-to-br dark:from-accent-emerald/50 dark:via-accent-teal/50 dark:to-accent-cyan/50 border-2 sm:border-4 dark:border-accent-emerald/70 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl"
+            style={{ background: 'linear-gradient(to bottom right, rgba(255, 253, 250, 0.5), rgba(255, 248, 240, 0.5), rgba(255, 245, 238, 0.5))', borderColor: 'rgba(139, 69, 19, 0.4)' }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.2 }}
-            whileHover={{ scale: 1.02, boxShadow: "0 12px 24px rgba(0, 255, 136, 0.3)" }}
+            whileHover={{ scale: 1.02, boxShadow: "0 12px 24px rgba(139, 69, 19, 0.3)" }}
           >
           <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <h3 className="text-accent-emerald dark:text-accent-teal text-xs sm:text-sm lg:text-base font-extrabold uppercase tracking-wide">Shopping Items</h3>
-            <div className="p-2 sm:p-4 bg-gradient-to-br from-accent-emerald via-accent-teal to-accent-cyan rounded-lg sm:rounded-xl shadow-xl animate-pulse">
+            <h3 className="dark:text-accent-teal text-xs sm:text-sm lg:text-base font-extrabold uppercase tracking-wide" style={{ color: '#8B4513' }}>Shopping Items</h3>
+            <div className="p-2 sm:p-4 rounded-lg sm:rounded-xl shadow-xl animate-pulse" style={{ background: 'linear-gradient(to bottom right, #8B4513, #A0522D, #CD853F)' }}>
               <FaShoppingCart className="text-xl sm:text-2xl lg:text-3xl text-white" />
             </div>
           </div>
-          <p className="text-3xl sm:text-4xl lg:text-5xl font-extrabold bg-gradient-to-r from-accent-emerald via-accent-teal to-accent-cyan bg-clip-text text-transparent mb-2 drop-shadow-lg">{stats.shoppingItems.total}</p>
+          <p className="text-3xl sm:text-4xl lg:text-5xl font-extrabold bg-clip-text text-transparent mb-2 drop-shadow-lg" style={{ backgroundImage: 'linear-gradient(to right, #8B4513, #A0522D, #CD853F)', WebkitBackgroundClip: 'text', backgroundClip: 'text' }}>{stats.shoppingItems.total}</p>
           <p className="text-xs sm:text-sm font-bold dark:text-dark-text-secondary light:text-light-text-secondary">{stats.shoppingItems.pending} pending</p>
           </motion.div>
 
           <motion.div 
-            className="bg-gradient-to-br from-accent-rose/40 via-accent-pink/40 to-accent-fuchsia/40 dark:bg-gradient-to-br dark:from-accent-rose/50 dark:via-accent-pink/50 dark:to-accent-fuchsia/50 border-2 sm:border-4 border-accent-rose/60 dark:border-accent-rose/70 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl sm:col-span-2 lg:col-span-1"
+            className="bg-gradient-to-br dark:bg-gradient-to-br dark:from-accent-rose/50 dark:via-accent-pink/50 dark:to-accent-fuchsia/50 border-2 sm:border-4 dark:border-accent-rose/70 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl sm:col-span-2 lg:col-span-1"
+            style={{ background: 'linear-gradient(to bottom right, rgba(255, 240, 245, 0.5), rgba(255, 228, 230, 0.5), rgba(255, 218, 225, 0.5))', borderColor: 'rgba(251, 182, 206, 0.5)' }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.3 }}
-            whileHover={{ scale: 1.02, boxShadow: "0 12px 24px rgba(255, 0, 110, 0.3)" }}
+            whileHover={{ scale: 1.02, boxShadow: "0 12px 24px rgba(251, 182, 206, 0.3)" }}
           >
           <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <h3 className="text-accent-rose dark:text-accent-pink text-xs sm:text-sm lg:text-base font-extrabold uppercase tracking-wide">Quick Actions</h3>
-            <div className="p-2 sm:p-4 bg-gradient-to-br from-accent-rose via-accent-pink to-accent-fuchsia rounded-lg sm:rounded-xl shadow-xl animate-pulse">
+            <h3 className="dark:text-accent-pink text-xs sm:text-sm lg:text-base font-extrabold uppercase tracking-wide" style={{ color: '#F8BBD0' }}>Quick Actions</h3>
+            <div className="p-2 sm:p-4 rounded-lg sm:rounded-xl shadow-xl animate-pulse" style={{ background: 'linear-gradient(to bottom right, #F8BBD0, #F48FB1, #F06292)' }}>
               <span className="text-xl sm:text-2xl lg:text-3xl">⚡</span>
             </div>
           </div>
@@ -294,10 +331,8 @@ export default function Dashboard() {
           </div>
           </motion.div>
         </div>
-      </ScrollReveal>
 
       {/* Monthly Expenditure Pie Chart */}
-      <ScrollReveal>
         <AnimatedCard className="p-4 sm:p-6">
         <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
           <div className="flex-1">
@@ -335,7 +370,7 @@ export default function Dashboard() {
                     innerRadius={30}
                     fill="#8884d8"
                     dataKey="value"
-                    paddingAngle={2}
+                    paddingAngle={0}
                   >
                     {monthlyData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
@@ -394,11 +429,9 @@ export default function Dashboard() {
           </div>
         )}
         </AnimatedCard>
-      </ScrollReveal>
 
       {/* Historical Months */}
       {historicalMonths.length > 0 && (
-        <ScrollReveal>
           <AnimatedCard className="p-4 sm:p-6">
           <div className="mb-4 sm:mb-6">
             <h2 className="text-lg sm:text-xl lg:text-2xl font-bold dark:text-dark-text light:text-light-text mb-1 sm:mb-2">
@@ -445,11 +478,9 @@ export default function Dashboard() {
             })}
           </div>
           </AnimatedCard>
-        </ScrollReveal>
       )}
 
       {/* Recent Expenses */}
-      <ScrollReveal>
         <AnimatedCard className="p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <h2 className="text-lg sm:text-xl lg:text-2xl font-bold dark:text-dark-text light:text-light-text">Recent Expenses</h2>
@@ -493,7 +524,6 @@ export default function Dashboard() {
           </div>
         )}
         </AnimatedCard>
-      </ScrollReveal>
     </div>
   )
 }

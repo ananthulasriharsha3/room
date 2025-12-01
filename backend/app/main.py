@@ -30,14 +30,14 @@ from supabase import Client, create_client
 
 DEFAULT_TASKS: List[str] = [
     "Cooking",
-    "Dishes Washing",
+    "Dish Washing",
     "Cutting & Rice",
 ]
 
 DEFAULT_PERSONS: List[str] = [
-    "Person 1",
-    "Person 2",
-    "Person 3",
+    "Dinesh",
+    "Harsha",
+    "Srinivas",
 ]
 
 
@@ -422,6 +422,48 @@ def _generate_year_dates(year: int) -> List[date]:
     return days
 
 
+# Reference start date: December 1, 2025
+REFERENCE_START_DATE = date(2025, 12, 1)
+
+
+def _calculate_weekday_index_from_reference(target_date: date) -> int:
+    """
+    Calculate the weekday index from the reference start date (Dec 1, 2025).
+    Only counts weekdays (Monday-Friday), skipping weekends.
+    Dec 1, 2025 (Monday) gets index 0.
+    For dates before Dec 1, 2025, returns negative values.
+    Note: This function is only called for weekdays (weekends are skipped in the calling code).
+    """
+    # Find the first weekday on or after Dec 1, 2025
+    first_weekday = REFERENCE_START_DATE
+    while first_weekday.strftime("%A") in ['Saturday', 'Sunday']:
+        first_weekday += timedelta(days=1)
+    
+    if target_date < first_weekday:
+        # For dates before the first weekday, count backwards
+        weekday_count = 0
+        current = first_weekday - timedelta(days=1)
+        while current >= target_date:
+            day_name = current.strftime("%A")
+            if day_name not in ['Saturday', 'Sunday']:
+                weekday_count -= 1
+            current -= timedelta(days=1)
+        return weekday_count
+    elif target_date == first_weekday:
+        return 0
+    else:
+        # For dates after the first weekday, count forwards
+        # Count weekdays from first_weekday (exclusive) up to target_date (inclusive)
+        weekday_count = 0
+        current = first_weekday
+        while current < target_date:
+            current += timedelta(days=1)
+            day_name = current.strftime("%A")
+            if day_name not in ['Saturday', 'Sunday']:
+                weekday_count += 1
+        return weekday_count
+
+
 def _rotate_assignments(
     persons: List[str],
     tasks: List[str],
@@ -430,12 +472,12 @@ def _rotate_assignments(
 ) -> Dict[str, str]:
     """
     Assign tasks to persons based on a 3-day cyclic rotation pattern.
-    This matches the exact pattern shown in the user's schedule images.
+    This matches the exact pattern shown in the user's schedule.
     
     Pattern (for 3 persons and 3 tasks):
-    - Day 0 (first weekday): Task[0]→Person[0], Task[1]→Person[1], Task[2]→Person[2]
-    - Day 1 (second weekday): Task[0]→Person[1], Task[1]→Person[2], Task[2]→Person[0]
-    - Day 2 (third weekday): Task[0]→Person[2], Task[1]→Person[0], Task[2]→Person[1]
+    - Day 0 (Dec 1, 2025 - Monday): Task[0]→Person[0], Task[1]→Person[1], Task[2]→Person[2]
+    - Day 1 (Dec 2, 2025 - Tuesday): Task[0]→Person[1], Task[1]→Person[2], Task[2]→Person[0]
+    - Day 2 (Dec 3, 2025 - Wednesday): Task[0]→Person[2], Task[1]→Person[0], Task[2]→Person[1]
     - Day 3 (fourth weekday): Repeats Day 0 pattern
     
     Example with persons=[Dinesh, Harsha, Srinivas] and tasks=[Cooking, Dish Washing, Cutting & Rice]:
@@ -522,21 +564,10 @@ def create_schedule(request: ScheduleRequest) -> ScheduleResponse:
     # Track task counts per person (for tracking purposes)
     task_counts: Dict[str, Dict[str, int]] = {task: {person: 0 for person in persons} for task in tasks}
     
-    # Track weekday index (only count weekdays for rotation)
-    # Reset at the start of each month for consistent monthly patterns
-    weekday_index = 0
-    current_month = None
-    
     for day in days:
         day_str = day.isoformat()
         day_name = day.strftime("%A")
-        day_month = day.month
         note = notes_map.get(day_str)
-        
-        # Reset weekday_index at the start of each new month
-        if current_month is not None and day_month != current_month:
-            weekday_index = 0
-        current_month = day_month
         
         # Skip weekends (Saturday and Sunday)
         if day_name in ['Saturday', 'Sunday']:
@@ -550,7 +581,9 @@ def create_schedule(request: ScheduleRequest) -> ScheduleResponse:
             )
         else:
             # Weekday - assign duties with 3-day cyclic rotation
-            # The pattern rotates every 3 weekdays, resetting at the start of each month
+            # Calculate weekday index from reference date (Dec 1, 2025)
+            # This ensures consistent rotation across all months
+            weekday_index = _calculate_weekday_index_from_reference(day)
             day_assignments = _rotate_assignments(persons, tasks, task_counts, weekday_index)
             assignments.append(
                 DailyAssignment(
@@ -560,8 +593,6 @@ def create_schedule(request: ScheduleRequest) -> ScheduleResponse:
                     note=note,
                 )
             )
-            # Increment weekday_index only for weekdays (not weekends)
-            weekday_index += 1
 
     schedule_response = ScheduleResponse(persons=persons, tasks=tasks, days=assignments)
     

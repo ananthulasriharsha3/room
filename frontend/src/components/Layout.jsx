@@ -40,13 +40,20 @@ export default function Layout() {
     navigation.push({ name: 'Admin', path: '/admin', icon: FaCog })
   }
 
+  // Ensure Dashboard is always first - force it to be included
+  const dashboardItem = navigation.find(item => item.path === '/dashboard') || { name: 'Dashboard', path: '/dashboard', icon: FaChartBar }
+  const sortedNavigation = [
+    dashboardItem,
+    ...navigation.filter(item => item.path !== '/dashboard')
+  ]
+
   const handleLogout = () => {
     logout()
     navigate('/login')
   }
 
   return (
-    <div className="h-screen dark:bg-dark-bg light:bg-light-bg flex flex-col w-full max-w-full overflow-x-hidden overflow-y-hidden">
+    <div className="h-screen dark:bg-dark-bg light:bg-light-bg flex flex-col w-full max-w-full overflow-x-hidden">
       {/* Top Navigation Bar */}
       <motion.nav 
         className="w-full dark:bg-gradient-to-r dark:from-dark-surface dark:to-dark-card light:bg-gradient-to-r light:from-light-surface light:to-light-card border-b dark:border-dark-border light:border-light-border sticky top-0 z-[60] transition-all duration-300 shadow-lg py-3 sm:py-4"
@@ -56,7 +63,7 @@ export default function Layout() {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2 rounded-lg dark:bg-dark-card/90 dark:backdrop-blur-sm light:bg-light-card dark:text-white light:text-light-text hover:opacity-80 transition-opacity border dark:border-dark-border/50 light:border-light-border shadow-md"
+              className="lg:hidden p-2 rounded-lg dark:bg-dark-card/90 dark:backdrop-blur-sm light:bg-light-card dark:text-white light:text-light-text hover:opacity-80 transition-opacity border dark:border-dark-border/50 light:border-light-border shadow-md z-[70] relative"
               aria-label="Toggle menu"
             >
               {sidebarOpen ? <FaTimes className="w-5 h-5" /> : <FaBars className="w-5 h-5" />}
@@ -107,59 +114,112 @@ export default function Layout() {
         </div>
       </motion.nav>
 
-      <div className="flex flex-1 relative w-full max-w-full overflow-hidden">
+      <div className="flex flex-1 relative w-full max-w-full min-h-0">
         {/* Mobile Sidebar Overlay */}
         {sidebarOpen && (
           <div
-            className="fixed inset-0 dark:bg-black/60 light:bg-black/70 z-40 lg:hidden backdrop-blur-sm"
+            className="fixed inset-0 dark:bg-black/60 light:bg-black/70 z-[45] lg:hidden backdrop-blur-sm"
             onClick={() => setSidebarOpen(false)}
           />
         )}
 
         {/* Sidebar */}
         <aside className={`
-          fixed lg:static left-0 z-50
-          top-0 lg:top-0 h-full lg:h-auto
-          w-64 dark:bg-dark-surface light:bg-light-surface 
+          fixed lg:static left-0 z-[55]
+          top-[80px] lg:top-0 h-[calc(100vh-80px)] lg:h-auto
+          w-64 sm:w-64 dark:bg-dark-surface light:bg-light-surface 
           border-r dark:border-dark-border light:border-light-border 
-          flex flex-col shadow-medium
+          flex flex-col shadow-2xl
           transform transition-transform duration-300 ease-in-out
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-          pt-16 lg:pt-0
-          overflow-hidden
-        `}>
-          <nav className="flex-1 p-4 space-y-2 overflow-hidden">
-            {navigation.map((item, index) => {
+          pt-0 lg:pt-0
+          overflow-y-auto overflow-x-hidden
+          -webkit-overflow-scrolling-touch
+          will-change-transform
+        `}
+        style={{
+          visibility: 'visible',
+          display: 'flex'
+        }}
+        >
+          <nav className="flex-1 p-4 space-y-2 min-h-0 overflow-y-auto pb-20 pt-6 lg:pt-2">
+            {/* Force Dashboard to always be first and visible */}
+            <div
+              key="dashboard-forced"
+              className="flex-shrink-0 w-full mb-2"
+              style={{ 
+                display: 'block', 
+                visibility: 'visible',
+                opacity: 1,
+                position: 'relative',
+                zIndex: 10,
+                marginTop: '0px'
+              }}
+            >
+              <Link
+                to="/dashboard"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 w-full ${
+                  location.pathname === '/dashboard'
+                    ? 'bg-gradient-to-r from-accent-indigo via-accent-violet to-accent-fuchsia text-white font-semibold shadow-lg shadow-accent-indigo/30'
+                    : 'bg-gradient-to-r from-accent-indigo via-accent-violet to-accent-fuchsia text-white font-semibold shadow-lg shadow-accent-indigo/30'
+                }`}
+                style={{ 
+                  display: 'flex', 
+                  visibility: 'visible',
+                  opacity: 1,
+                  color: 'white'
+                }}
+              >
+                <FaChartBar className="w-5 h-5 flex-shrink-0" style={{ opacity: 1 }} />
+                <span className="text-sm sm:text-base whitespace-nowrap font-bold">Dashboard</span>
+              </Link>
+            </div>
+            
+            {sortedNavigation.length === 0 && (
+              <div className="text-red-500 p-4">No navigation items found!</div>
+            )}
+            {sortedNavigation.filter(item => item.path !== '/dashboard').map((item, index) => {
               const isActive = location.pathname === item.path
               const IconComponent = item.icon
+              
               return (
-                <motion.div
+                <div
                   key={item.path}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.2, delay: index * 0.05 }}
+                  className="flex-shrink-0 w-full"
+                  style={{ 
+                    display: 'block', 
+                    visibility: 'visible',
+                    opacity: 1
+                  }}
                 >
                   <Link
                     to={item.path}
                     onClick={() => setSidebarOpen(false)}
-                    className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                    className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 w-full ${
                       isActive
                         ? 'bg-gradient-to-r from-accent-indigo via-accent-violet to-accent-fuchsia text-white font-semibold shadow-lg shadow-accent-indigo/30'
-                        : 'dark:text-dark-text-secondary light:text-light-text-secondary dark:hover:bg-dark-card light:hover:bg-light-card hover:translate-x-1 hover:dark:bg-gradient-to-r hover:dark:from-dark-card hover:dark:to-dark-surface hover:light:bg-gradient-to-r hover:light:from-light-card hover:light:to-light-surface'
+                        : 'dark:text-white light:text-light-text dark:hover:bg-dark-card light:hover:bg-light-card hover:translate-x-1 hover:dark:bg-gradient-to-r hover:dark:from-dark-card hover:dark:to-dark-surface hover:light:bg-gradient-to-r hover:light:from-light-card hover:light:to-light-surface'
                     }`}
+                    style={{ 
+                      display: 'flex', 
+                      visibility: 'visible',
+                      opacity: 1,
+                      color: isActive ? 'white' : undefined
+                    }}
                   >
-                    <IconComponent className="w-5 h-5 flex-shrink-0" />
-                    <span className="text-sm sm:text-base">{item.name}</span>
+                    <IconComponent className="w-5 h-5 flex-shrink-0" style={{ opacity: 1 }} />
+                    <span className="text-sm sm:text-base whitespace-nowrap font-medium">{item.name}</span>
                   </Link>
-                </motion.div>
+                </div>
               )
             })}
           </nav>
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden w-full min-w-0 max-w-full h-full">
-          <div className="p-4 sm:p-6 lg:p-8 mx-auto w-full box-border" style={{ maxWidth: 'min(100%, 1280px)' }}>
+        <main className="flex-1 overflow-y-auto overflow-x-hidden w-full min-w-0 max-w-full min-h-0 relative z-10">
+          <div className="p-4 sm:p-6 lg:p-8 mx-auto w-full box-border pb-8" style={{ maxWidth: 'min(100%, 1280px)' }}>
             <Outlet />
           </div>
         </main>

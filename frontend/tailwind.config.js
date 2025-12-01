@@ -19,11 +19,11 @@ export default {
         'dark-primary': '#5e3aff', // Deep indigo
         'dark-accent': '#8b2eff', // Electric violet
         
-        // Light mode colors - Bright, vibrant colors
-        'light-bg': '#f0f4ff',
-        'light-surface': '#ffffff',
-        'light-card': '#f8faff',
-        'light-border': '#e0e7ff',
+        // Light mode colors - Soft, fresh palette
+        'light-bg': '#DFF7E8',        // Light Mint Green - background
+        'light-surface': '#F3EDE4',   // Soft Beige - surface/card
+        'light-card': '#F3EDE4',      // Soft Beige - card background
+        'light-border': '#E8E6F5',    // Pale Lavender Grey - borders
         'light-text': '#1e293b',
         'light-text-secondary': '#475569',
         'light-text-tertiary': '#94a3b8',
@@ -31,6 +31,11 @@ export default {
         'light-accent': '#8b2eff', // Electric violet
         
         // Accent colors - Bold, trending, attractive palette
+        // Dynamic accent colors that use CSS variables for theme customization
+        'accent-indigo': 'var(--theme-primary, #5e3aff)',      // Deep indigo - uses custom theme primary
+        'accent-violet': 'var(--theme-secondary, #8b2eff)',   // Electric violet - uses custom theme secondary
+        'accent-fuchsia': 'var(--theme-accent, #ff00ff)',     // Magenta fuchsia - uses custom theme accent
+        // Static accent colors (not affected by theme customization)
         'accent-blue': '#0066ff',        // Electric blue
         'accent-purple': '#9333ea',      // Vibrant purple
         'accent-pink': '#ff006e',        // Hot pink
@@ -39,15 +44,12 @@ export default {
         'accent-amber': '#ffb800',       // Bold amber
         'accent-orange': '#ff6b35',      // Vibrant orange
         'accent-red': '#ff1744',         // Bold red
-        'accent-indigo': '#5e3aff',      // Deep indigo
-        'accent-violet': '#8b2eff',      // Electric violet
         'accent-rose': '#ff006e',        // Bold rose
         'accent-teal': '#00ffcc',        // Bright teal
         'accent-emerald': '#00ff88',     // Neon emerald
         'accent-lime': '#aaff00',        // Electric lime
         'accent-yellow': '#ffd700',      // Gold yellow
         'accent-sky': '#00b8ff',         // Bright sky
-        'accent-fuchsia': '#ff00ff',     // Magenta fuchsia
       },
       boxShadow: {
         'soft': '0 2px 8px rgba(0, 0, 0, 0.1)',
