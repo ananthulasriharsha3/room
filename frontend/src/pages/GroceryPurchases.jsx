@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
-import api from '../utils/api'
+import { useLocation } from 'react-router-dom'
+import { listGroceryPurchases, addGroceryPurchase, addGroceryPurchasesBatch, deleteGroceryPurchase, scanBill } from '../utils/grocery'
 import { format } from 'date-fns'
 import { FaCamera, FaTrash } from 'react-icons/fa'
 
 export default function GroceryPurchases() {
+  const location = useLocation()
+  const isGrocery = location.pathname === '/grocery'
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -27,8 +30,8 @@ export default function GroceryPurchases() {
 
   const fetchItems = async () => {
     try {
-      const response = await api.get('/grocery-purchases')
-      setItems(response.data.sort((a, b) => new Date(b.purchase_date) - new Date(a.purchase_date)))
+      const data = await listGroceryPurchases()
+      setItems(data.sort((a, b) => new Date(b.purchase_date) - new Date(a.purchase_date)))
     } catch (error) {
       console.error('Error fetching grocery purchases:', error)
     } finally {
@@ -39,11 +42,12 @@ export default function GroceryPurchases() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      await api.post('/grocery-purchases', {
-        ...formData,
+      await addGroceryPurchase({
+        name: formData.name,
         price: parseFloat(formData.price),
         quantity: formData.quantity || null,
         unit: formData.unit || null,
+        purchase_date: formData.purchase_date,
       })
       setFormData({
         name: '',
@@ -56,7 +60,7 @@ export default function GroceryPurchases() {
       fetchItems()
     } catch (error) {
       console.error('Error adding grocery purchase:', error)
-      alert(error.response?.data?.detail || 'Failed to add grocery purchase')
+      alert(error.message || 'Failed to add grocery purchase')
     }
   }
 
@@ -66,18 +70,11 @@ export default function GroceryPurchases() {
 
     setScanning(true)
     try {
-      const formData = new FormData()
-      formData.append('file', scanFile)
-
-      const response = await api.post('/grocery-bills/scan', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
-      setScanResults(response.data)
+      const response = await scanBill(scanFile)
+      setScanResults(response)
     } catch (error) {
       console.error('Error scanning bill:', error)
-      alert(error.response?.data?.detail || 'Failed to scan bill. Make sure Tesseract OCR is installed.')
+      alert(error.message || 'Failed to scan bill. Bill scanning is not available in the frontend. Please use manual entry.')
     } finally {
       setScanning(false)
     }
@@ -91,10 +88,9 @@ export default function GroceryPurchases() {
         quantity: item.quantity || null,
         unit: item.unit || null,
         purchase_date: format(new Date(), 'yyyy-MM-dd'),
-        is_from_bill: true,
       }))
 
-      await api.post('/grocery-purchases/batch', purchases)
+      await addGroceryPurchasesBatch(purchases)
       setScanResults(null)
       setShowScanForm(false)
       setScanFile(null)
@@ -102,7 +98,7 @@ export default function GroceryPurchases() {
       alert('Items added successfully!')
     } catch (error) {
       console.error('Error adding scanned items:', error)
-      alert(error.response?.data?.detail || 'Failed to add items')
+      alert(error.message || 'Failed to add items')
     }
   }
 
@@ -110,11 +106,11 @@ export default function GroceryPurchases() {
     if (!confirm('Are you sure you want to delete this purchase?')) return
 
     try {
-      await api.delete(`/grocery-purchases/${itemId}`)
+      await deleteGroceryPurchase(itemId)
       fetchItems()
     } catch (error) {
       console.error('Error deleting purchase:', error)
-      alert(error.response?.data?.detail || 'Failed to delete purchase')
+      alert(error.message || 'Failed to delete purchase')
     }
   }
 
@@ -146,7 +142,7 @@ export default function GroceryPurchases() {
 
     try {
       const deletePromises = Array.from(selectedItems).map(id => 
-        api.delete(`/grocery-purchases/${id}`)
+        deleteGroceryPurchase(id)
       )
       await Promise.all(deletePromises)
       setSelectedItems(new Set())
@@ -155,7 +151,7 @@ export default function GroceryPurchases() {
       alert(`${selectedItems.size} item(s) deleted successfully!`)
     } catch (error) {
       console.error('Error deleting items:', error)
-      alert(error.response?.data?.detail || 'Failed to delete items')
+      alert(error.message || 'Failed to delete items')
     }
   }
 
@@ -197,7 +193,7 @@ export default function GroceryPurchases() {
               setShowScanForm(!showScanForm)
               setShowAddForm(false)
             }}
-            className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-accent-rose via-accent-pink to-accent-fuchsia text-white font-semibold rounded-lg sm:rounded-xl hover:shadow-lg hover:shadow-accent-rose/30 hover:scale-105 transition-all flex items-center justify-center gap-2"
+            className="btn-stranger w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base flex items-center justify-center gap-2"
           >
             <FaCamera /> Scan Bill
           </button>
@@ -206,7 +202,7 @@ export default function GroceryPurchases() {
               setShowAddForm(!showAddForm)
               setShowScanForm(false)
             }}
-            className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-accent-fuchsia to-accent-rose text-white font-semibold rounded-lg sm:rounded-xl hover:shadow-lg hover:shadow-accent-fuchsia/30 hover:scale-105 transition-all"
+            className="btn-stranger w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base"
           >
             + Add Item
           </button>
@@ -215,7 +211,9 @@ export default function GroceryPurchases() {
 
       {/* Scan Bill Form */}
       {showScanForm && (
-        <div className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft">
+        <div className={`${isGrocery ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border'} rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft`}
+        style={isGrocery ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
+        >
           <h2 className="text-lg sm:text-xl lg:text-2xl font-bold dark:text-dark-text light:text-light-text mb-3 sm:mb-4">Scan Grocery Bill</h2>
           {!scanResults ? (
             <form onSubmit={handleScan} className="space-y-3 sm:space-y-4">
@@ -228,7 +226,8 @@ export default function GroceryPurchases() {
                   accept="image/*"
                   onChange={(e) => setScanFile(e.target.files[0])}
                   required
-                  className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all"
+                  className={`w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base ${isGrocery ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all`}
+                  style={isGrocery ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
                 />
                 <p className="text-xs dark:text-dark-text-tertiary light:text-light-text-tertiary mt-1">
                   Note: Requires Tesseract OCR to be installed
@@ -237,14 +236,16 @@ export default function GroceryPurchases() {
               <button
                 type="submit"
                 disabled={scanning || !scanFile}
-                className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-accent-teal to-accent-cyan text-white font-semibold rounded-lg sm:rounded-xl hover:shadow-lg hover:shadow-accent-teal/30 hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                className="btn-stranger w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 {scanning ? 'Scanning...' : 'Scan Bill'}
               </button>
             </form>
           ) : (
             <div className="space-y-4">
-              <div className="dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl p-4">
+              <div className={`${isGrocery ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-xl p-4`}
+              style={isGrocery ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
+              >
                 <h3 className="font-semibold dark:text-dark-text light:text-light-text mb-3">Scanned Items:</h3>
                 <div className="space-y-2">
                   {scanResults.items.map((item, idx) => (
@@ -257,7 +258,7 @@ export default function GroceryPurchases() {
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                 <button
                   onClick={() => handleAddFromScan(scanResults.items)}
-                  className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-accent-lime via-accent-emerald to-accent-teal text-white font-semibold rounded-lg sm:rounded-xl hover:shadow-lg hover:shadow-accent-lime/30 hover:scale-105 transition-all"
+                  className="btn-stranger w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base"
                 >
                   Add All Items
                 </button>
@@ -266,7 +267,8 @@ export default function GroceryPurchases() {
                     setScanResults(null)
                     setScanFile(null)
                   }}
-                  className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border dark:text-dark-text light:text-light-text font-semibold rounded-lg sm:rounded-xl hover:opacity-90 transition-opacity"
+                  className={`w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base ${isGrocery ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} dark:text-dark-text light:text-light-text font-semibold rounded-lg sm:rounded-xl hover:opacity-90 transition-opacity`}
+                  style={isGrocery ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
                 >
                   Scan Again
                 </button>
@@ -278,7 +280,9 @@ export default function GroceryPurchases() {
 
       {/* Add Item Form */}
       {showAddForm && (
-        <div className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft">
+        <div className={`${isGrocery ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border'} rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft`}
+        style={isGrocery ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
+        >
           <h2 className="text-lg sm:text-xl lg:text-2xl font-bold dark:text-dark-text light:text-light-text mb-3 sm:mb-4">Add Grocery Purchase</h2>
           <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -292,7 +296,8 @@ export default function GroceryPurchases() {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                   maxLength={200}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all"
+                  className={`w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base ${isGrocery ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all`}
+                  style={isGrocery ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
                 />
               </div>
               <div>
@@ -306,7 +311,8 @@ export default function GroceryPurchases() {
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                   required
-                  className="w-full px-4 py-3 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all"
+                  className={`w-full px-4 py-3 ${isGrocery ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all`}
+                  style={isGrocery ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
                 />
               </div>
               <div>
@@ -317,7 +323,8 @@ export default function GroceryPurchases() {
                   type="text"
                   value={formData.quantity}
                   onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                  className="w-full px-4 py-3 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all"
+                  className={`w-full px-4 py-3 ${isGrocery ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all`}
+                  style={isGrocery ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
                 />
               </div>
               <div>
@@ -328,7 +335,8 @@ export default function GroceryPurchases() {
                   type="text"
                   value={formData.unit}
                   onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                  className="w-full px-4 py-3 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all"
+                  className={`w-full px-4 py-3 ${isGrocery ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all`}
+                  style={isGrocery ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
                   placeholder="kg, L, etc."
                 />
               </div>
@@ -341,7 +349,8 @@ export default function GroceryPurchases() {
                   value={formData.purchase_date}
                   onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
                   required
-                  className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all"
+                  className={`w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base ${isGrocery ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all`}
+                  style={isGrocery ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
                 />
               </div>
             </div>
@@ -363,7 +372,7 @@ export default function GroceryPurchases() {
             {!isSelectMode ? (
               <button
                 onClick={() => setIsSelectMode(true)}
-                className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-accent-red via-accent-rose to-accent-pink text-white font-extrabold rounded-lg sm:rounded-xl hover:shadow-2xl hover:shadow-accent-red/50 hover:scale-110 transition-all flex items-center justify-center gap-2 border-2 border-accent-red/50"
+                className="btn-stranger w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base flex items-center justify-center gap-2"
               >
                 <FaTrash className="text-base sm:text-lg" /> Delete All
               </button>
@@ -371,20 +380,20 @@ export default function GroceryPurchases() {
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
                 <button
                   onClick={handleSelectAll}
-                  className="w-full sm:w-auto px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm bg-gradient-to-r from-accent-indigo via-accent-violet to-accent-fuchsia text-white font-extrabold rounded-lg sm:rounded-xl hover:shadow-2xl hover:shadow-accent-indigo/50 hover:scale-110 transition-all border-2 border-accent-indigo/50 break-words"
+                  className="btn-stranger w-full sm:w-auto px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm break-words"
                 >
                   {selectedItems.size === items.length ? 'Deselect All' : 'Select All'}
                 </button>
                 <button
                   onClick={handleDeleteSelected}
                   disabled={selectedItems.size === 0}
-                  className="w-full sm:w-auto px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm bg-gradient-to-r from-accent-red via-accent-rose to-accent-pink text-white font-extrabold rounded-lg sm:rounded-xl hover:shadow-2xl hover:shadow-accent-red/50 hover:scale-110 transition-all flex items-center justify-center gap-1 sm:gap-2 border-2 border-accent-red/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 break-words"
+                  className="btn-stranger w-full sm:w-auto px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 break-words"
                 >
                   <FaTrash className="text-sm sm:text-base flex-shrink-0" /> <span className="break-words">Delete ({selectedItems.size})</span>
                 </button>
                 <button
                   onClick={handleCancelSelect}
-                  className="w-full sm:w-auto px-4 sm:px-5 py-2 sm:py-3 text-xs sm:text-base bg-gradient-to-r from-accent-sky via-accent-cyan to-accent-teal text-white font-extrabold rounded-lg sm:rounded-xl hover:shadow-2xl hover:shadow-accent-sky/50 hover:scale-110 transition-all border-2 border-accent-sky/50"
+                  className="btn-stranger w-full sm:w-auto px-4 sm:px-5 py-2 sm:py-3 text-xs sm:text-base"
                 >
                   Cancel
                 </button>
@@ -456,7 +465,7 @@ export default function GroceryPurchases() {
                                   e.stopPropagation()
                                   handleDelete(item.id)
                                 }}
-                                className="px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-accent-red via-accent-rose to-accent-pink text-white rounded-lg sm:rounded-xl hover:shadow-2xl hover:shadow-accent-red/50 hover:scale-110 transition-all text-xs sm:text-sm font-extrabold border-2 border-accent-red/50"
+                                className="btn-stranger px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm"
                               >
                                 Delete
                               </button>

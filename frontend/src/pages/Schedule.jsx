@@ -1,12 +1,16 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import api from '../utils/api'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { getSchedule, createSchedule } from '../utils/schedule'
+import { getSettings } from '../utils/settings'
+import { getDayNote } from '../utils/dayNotes'
 import { format, startOfYear, endOfYear, eachDayOfInterval, getYear, differenceInDays, startOfDay } from 'date-fns'
 import { FaSync, FaLightbulb, FaEdit, FaCalendarDay } from 'react-icons/fa'
 import NoteFloatingWidget from '../components/NoteFloatingWidget'
 
 export default function Schedule() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const isSchedule = location.pathname === '/schedule'
   const [schedule, setSchedule] = useState(null)
   const [settings, setSettings] = useState(null)
   const [dayNotes, setDayNotes] = useState({}) // Map of date strings to notes
@@ -22,16 +26,16 @@ export default function Schedule() {
 
   const loadSavedSchedule = async () => {
     try {
-      const response = await api.get(`/schedule/${selectedYear}`)
-      setSchedule(response.data)
+      const data = await getSchedule(selectedYear)
+      setSchedule(data)
       // Don't reset currentStartIndex here - let the selectedStartDate effect handle it
       setError(null)
     } catch (error) {
       // Schedule not found is expected if not generated yet - don't show error
-      if (error.response?.status !== 404) {
+      if (error.message && !error.message.includes('not found')) {
         console.error('Error loading saved schedule:', error)
       }
-      // Don't set error for 404 - just means schedule hasn't been generated yet
+      // Don't set error for not found - just means schedule hasn't been generated yet
     }
   }
 
@@ -70,8 +74,8 @@ export default function Schedule() {
 
   const fetchSettings = async () => {
     try {
-      const response = await api.get('/settings')
-      setSettings(response.data)
+      const data = await getSettings()
+      setSettings(data)
     } catch (error) {
       console.error('Error fetching settings:', error)
       setError('Failed to load settings. Please refresh the page.')
@@ -84,16 +88,13 @@ export default function Schedule() {
     setGenerating(true)
     setError(null)
     try {
-      const response = await api.post('/schedule', {
-        year: selectedYear,
-        month: null, // Generate full year
-      })
-      setSchedule(response.data)
+      const data = await createSchedule(selectedYear, null)
+      setSchedule(data)
       setCurrentStartIndex(0) // Reset to first page
       setDayNotes({}) // Clear notes when schedule is regenerated
     } catch (error) {
       console.error('Error generating schedule:', error)
-      const errorMessage = error.response?.data?.detail || error.message || 'Failed to generate schedule. Please try again.'
+      const errorMessage = error.message || 'Failed to generate schedule. Please try again.'
       setError(errorMessage)
       setSchedule(null)
     } finally {
@@ -192,15 +193,15 @@ export default function Schedule() {
         
         while (retries >= 0 && !success && !cancelled) {
           try {
-            const response = await api.get(`/day-notes/${dateStr}`)
+            const response = await getDayNote(dateStr)
             if (!cancelled) {
-              notesMap[dateStr] = response.data.note
+              notesMap[dateStr] = response.note
             }
             success = true
           } catch (error) {
-            if (error.response?.status === 404) {
+            if (error.message && error.message.includes('not found')) {
               success = true
-            } else if (error.response?.status === 502 && retries > 0) {
+            } else if (retries > 0) {
               retries--
               await new Promise(resolve => setTimeout(resolve, 200))
             } else {
@@ -249,7 +250,9 @@ export default function Schedule() {
             onChange={handleYearChange}
             min="1900"
             max="2100"
-            className="px-3 sm:px-4 py-2 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all w-20 sm:w-32 text-sm sm:text-base font-semibold flex-shrink-0"
+            className={`px-3 sm:px-4 py-2 border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all w-20 sm:w-32 text-sm sm:text-base font-semibold flex-shrink-0 ${
+              isSchedule ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card dark:border-dark-border light:border-light-border'
+            }`}
             placeholder="Year"
             style={{
               color: 'inherit',
@@ -295,17 +298,17 @@ export default function Schedule() {
       )}
 
       {schedule && (
-        <div className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft">
+        <div className="border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft backdrop-blur-sm" style={{ background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' }}>
           <div className="mb-4 sm:mb-6">
             <h2 className="text-xl sm:text-2xl font-bold dark:text-dark-text light:text-light-text mb-2 sm:mb-3">
               {selectedYear}
             </h2>
             <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm mb-3 sm:mb-4">
-              <div className="dark:bg-dark-card light:bg-light-card px-2 sm:px-3 py-1 rounded-lg">
+              <div className="px-2 sm:px-3 py-1 rounded-lg backdrop-blur-sm" style={{ background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' }}>
                 <span className="dark:text-dark-text-secondary light:text-light-text-secondary">People: </span>
                 <span className="dark:text-dark-text light:text-light-text font-medium">{schedule.persons.join(', ')}</span>
               </div>
-              <div className="dark:bg-dark-card light:bg-light-card px-2 sm:px-3 py-1 rounded-lg">
+              <div className="px-2 sm:px-3 py-1 rounded-lg backdrop-blur-sm" style={{ background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' }}>
                 <span className="dark:text-dark-text-secondary light:text-light-text-secondary">Tasks: </span>
                 <span className="dark:text-dark-text light:text-light-text font-medium">{schedule.tasks.join(', ')}</span>
               </div>
@@ -328,11 +331,15 @@ export default function Schedule() {
                       onChange={handleDateSelect}
                       min={`${selectedYear}-01-01`}
                       max={`${selectedYear}-12-31`}
-                      className="flex-1 sm:flex-none px-2 sm:px-3 py-2 text-sm dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all"
+                      className={`flex-1 sm:flex-none px-2 sm:px-3 py-2 text-sm border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all ${
+                        isSchedule ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card dark:border-dark-border light:border-light-border'
+                      }`}
                     />
                     <button
                       onClick={jumpToToday}
-                      className="px-2 sm:px-3 py-2 text-xs sm:text-sm dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text hover:opacity-80 transition-opacity font-medium whitespace-nowrap"
+                      className={`px-2 sm:px-3 py-2 text-xs sm:text-sm border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text hover:opacity-80 transition-opacity font-medium whitespace-nowrap ${
+                        isSchedule ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card dark:border-dark-border light:border-light-border'
+                      }`}
                       title="Jump to today"
                     >
                       <FaCalendarDay className="inline w-3 h-3 sm:w-4 sm:h-4 mr-1" /> Today
@@ -348,14 +355,18 @@ export default function Schedule() {
                 <button
                   onClick={handlePrevious}
                   disabled={!canGoPrevious}
-                  className="flex-1 sm:flex-none min-w-[100px] sm:min-w-0 px-4 sm:px-4 py-3 sm:py-2 text-sm sm:text-sm dark:bg-dark-card light:bg-light-card border-2 dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text hover:opacity-80 hover:border-accent-blue transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-dark-border disabled:hover:border-light-border font-semibold shadow-md sm:shadow-none active:scale-95"
+                  className={`flex-1 sm:flex-none min-w-[100px] sm:min-w-0 px-4 sm:px-4 py-3 sm:py-2 text-sm sm:text-sm border-2 rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text hover:opacity-80 hover:border-accent-blue transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-md sm:shadow-none active:scale-95 ${
+                    isSchedule ? 'bg-transparent/20 backdrop-blur-sm border-white/20' : 'dark:bg-dark-card light:bg-light-card dark:border-dark-border light:border-light-border disabled:hover:border-dark-border disabled:hover:border-light-border'
+                  }`}
                 >
                   ← <span className="hidden sm:inline">Previous 5 Days</span><span className="sm:hidden">Prev</span>
                 </button>
                 <button
                   onClick={handleNext}
                   disabled={!canGoNext}
-                  className="flex-1 sm:flex-none min-w-[100px] sm:min-w-0 px-4 sm:px-4 py-3 sm:py-2 text-sm sm:text-sm dark:bg-dark-card light:bg-light-card border-2 dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text hover:opacity-80 hover:border-accent-blue transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-dark-border disabled:hover:border-light-border font-semibold shadow-md sm:shadow-none active:scale-95"
+                  className={`flex-1 sm:flex-none min-w-[100px] sm:min-w-0 px-4 sm:px-4 py-3 sm:py-2 text-sm sm:text-sm border-2 rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text hover:opacity-80 hover:border-accent-blue transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-md sm:shadow-none active:scale-95 ${
+                    isSchedule ? 'bg-transparent/20 backdrop-blur-sm border-white/20' : 'dark:bg-dark-card light:bg-light-card dark:border-dark-border light:border-light-border disabled:hover:border-dark-border disabled:hover:border-light-border'
+                  }`}
                 >
                   <span className="hidden sm:inline">Next 5 Days</span><span className="sm:hidden">Next</span> →
                 </button>
@@ -379,10 +390,12 @@ export default function Schedule() {
               return (
                 <div
                   key={day.toISOString()}
-                  className={`relative dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl p-3 sm:p-4 min-h-[150px] sm:min-h-[180px] lg:min-h-[200px] hover:shadow-soft transition-shadow ${
+                  className={`relative border rounded-lg sm:rounded-xl p-3 sm:p-4 min-h-[150px] sm:min-h-[180px] lg:min-h-[200px] hover:shadow-soft transition-shadow backdrop-blur-sm ${
+                    isSchedule ? 'bg-transparent/10 border-white/15' : 'dark:bg-dark-card light:bg-light-card dark:border-dark-border light:border-light-border'
+                  } ${
                     isWeekend ? 'opacity-90' : ''
                   } ${
-                    isToday ? 'ring-4 ring-[#22C55E] dark:ring-[#15803D] bg-[#22C55E]/10 dark:bg-[#15803D]/20 border-[#22C55E] dark:border-[#15803D] shadow-2xl dark:shadow-[#15803D]/50 light:shadow-[#22C55E]/70' : ''
+                    isToday ? 'ring-4 ring-[#E50914] dark:ring-[#B1060F] bg-[#E50914]/10 dark:bg-[#B1060F]/20 border-[#E50914] dark:border-[#B1060F] shadow-2xl dark:shadow-[#B1060F]/50 light:shadow-[#E50914]/70' : ''
                   }`}
                 >
                   {hasNote && (
@@ -430,7 +443,7 @@ export default function Schedule() {
       )}
 
       {!schedule && !generating && !error && (
-        <div className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-2xl p-8 text-center shadow-soft">
+        <div className="border rounded-2xl p-8 text-center shadow-soft backdrop-blur-sm" style={{ background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' }}>
           <p className="dark:text-dark-text-secondary light:text-light-text-secondary">Select a year and click Generate Year to create a schedule</p>
         </div>
       )}

@@ -10,23 +10,23 @@ export function AnimatedButton({
 }) {
   const prefersReducedMotion = useReducedMotion()
 
-  const baseClasses = "inline-flex items-center justify-center rounded-lg px-4 py-2 font-medium shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+  const baseClasses = "btn-stranger inline-flex items-center justify-center rounded px-4 py-2 font-semibold letter-spacing: 0.05em focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
 
   const variants = {
-    primary: "bg-gradient-to-r from-accent-indigo via-accent-violet to-accent-fuchsia text-white hover:from-accent-violet hover:via-accent-fuchsia hover:to-accent-indigo focus-visible:ring-accent-indigo",
-    secondary: "dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border dark:text-dark-text light:text-light-text hover:opacity-90 focus-visible:ring-accent-violet",
-    success: "bg-gradient-to-r from-accent-emerald via-accent-teal to-accent-cyan text-white hover:from-accent-teal hover:via-accent-cyan hover:to-accent-emerald focus-visible:ring-accent-emerald",
-    danger: "bg-gradient-to-r from-accent-red to-accent-rose text-white hover:from-accent-rose hover:to-accent-red focus-visible:ring-accent-red",
+    primary: "text-white hover:neon-red-strong focus-visible:ring-stranger-red",
+    secondary: "border border-stranger-border text-white hover:border-stranger-red hover:neon-red focus-visible:ring-stranger-red",
+    success: "text-white hover:neon-red-strong focus-visible:ring-stranger-red",
+    danger: "text-white hover:neon-red-strong focus-visible:ring-stranger-red",
   }
 
-  const hoverScale = prefersReducedMotion ? 1 : 1.02
-  const tapScale = prefersReducedMotion ? 1 : 0.97
+  const hoverScale = prefersReducedMotion ? 1 : 1.05
+  const tapScale = prefersReducedMotion ? 1 : 0.98
 
   return (
     <motion.button
-      whileHover={disabled ? {} : { scale: hoverScale, boxShadow: "0 4px 12px rgba(94, 58, 255, 0.3)" }}
+      whileHover={disabled ? {} : { scale: hoverScale }}
       whileTap={disabled ? {} : { scale: tapScale }}
-      transition={{ duration: 0.15, ease: "easeOut" }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
       className={`${baseClasses} ${variants[variant]} ${className}`}
       disabled={disabled}
       {...props}

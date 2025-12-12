@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import api from '../utils/api'
+import { listExpenses, closeMonth } from '../utils/expenses'
+import { listShoppingItems } from '../utils/shopping'
+import { listGroceryPurchases } from '../utils/grocery'
+import { areNotificationsEnabled, requestNotificationPermission } from '../utils/notifications'
 import { format, startOfMonth, parseISO } from 'date-fns'
 import { FaDollarSign, FaShoppingCart } from 'react-icons/fa'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
@@ -19,9 +22,11 @@ export default function Dashboard() {
   const [historicalMonths, setHistoricalMonths] = useState([])
   const [loading, setLoading] = useState(true)
   const [closingMonth, setClosingMonth] = useState(false)
+  const [notificationEnabled, setNotificationEnabled] = useState(false)
 
   useEffect(() => {
     fetchDashboardData()
+    setNotificationEnabled(areNotificationsEnabled())
     // Safety timeout - ensure loading doesn't stay true forever
     const timeout = setTimeout(() => {
       setLoading(false)
@@ -29,6 +34,16 @@ export default function Dashboard() {
     
     return () => clearTimeout(timeout)
   }, [])
+
+  const handleEnableNotifications = async () => {
+    const enabled = await requestNotificationPermission()
+    setNotificationEnabled(enabled)
+    if (enabled) {
+      alert('Notifications enabled! You will receive reminders for your duties.')
+    } else {
+      alert('Please enable notifications in your browser settings to receive duty reminders.')
+    }
+  }
 
   const handleCloseMonth = async () => {
     const currentMonthStr = format(startOfMonth(new Date()), 'yyyy-MM')
@@ -38,12 +53,12 @@ export default function Dashboard() {
     
     setClosingMonth(true)
     try {
-      await api.post('/months/close', { month: currentMonthStr })
+      await closeMonth(currentMonthStr)
       alert(`Successfully closed ${format(new Date(), 'MMMM yyyy')}!`)
       await fetchDashboardData()
     } catch (error) {
       console.error('Error closing month:', error)
-      alert('Failed to close month. Please try again.')
+      alert(error.message || 'Failed to close month. Please try again.')
     } finally {
       setClosingMonth(false)
     }
@@ -57,27 +72,23 @@ export default function Dashboard() {
       let groceries = []
       
       try {
-        const expensesRes = await api.get('/expenses')
-        expenses = expensesRes.data || []
+        expenses = await listExpenses()
       } catch (error) {
         console.error('Error fetching expenses:', error)
         // Continue with empty array
       }
       
       try {
-        const shoppingRes = await api.get('/shopping-items')
-        shoppingItems = shoppingRes.data || []
+        shoppingItems = await listShoppingItems()
       } catch (error) {
         console.error('Error fetching shopping items:', error)
         // Continue with empty array
       }
       
       try {
-        const groceriesRes = await api.get('/grocery-purchases')
-        groceries = groceriesRes.data || []
+        groceries = await listGroceryPurchases()
       } catch (error) {
         console.error('Error fetching grocery purchases:', error)
-        console.error('Error details:', error.response?.data)
         // Continue with empty array
       }
 
@@ -257,17 +268,30 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 lg:space-y-8 relative z-10 w-full">
+    <div className="relative z-10 space-y-4 sm:space-y-6 lg:space-y-8 w-full">
       <div>
-        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold dark:text-dark-text light:text-light-text mb-2">Dashboard</h1>
-        <p className="text-sm sm:text-base dark:text-dark-text-secondary light:text-light-text-secondary">Overview of your room duties and expenses</p>
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold dark:text-dark-text light:text-light-text mb-2">Dashboard</h1>
+            <p className="text-sm sm:text-base dark:text-dark-text-secondary light:text-light-text-secondary">Overview of your room duties and expenses</p>
+          </div>
+          {!notificationEnabled && (
+            <button
+              onClick={handleEnableNotifications}
+              className="btn-stranger px-4 py-2 text-sm whitespace-nowrap"
+              title="Enable notifications for duty reminders"
+            >
+              🔔 Enable Notifications
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
           <motion.div 
-            className="bg-gradient-to-br dark:bg-gradient-to-br dark:from-accent-indigo/50 dark:via-accent-violet/50 dark:to-accent-fuchsia/50 border-2 sm:border-4 dark:border-accent-indigo/70 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl"
-            style={{ background: 'linear-gradient(to bottom right, rgba(255, 253, 250, 0.5), rgba(255, 245, 238, 0.5), rgba(255, 240, 245, 0.5))', borderColor: 'rgba(139, 69, 19, 0.4)' }}
+            className="border-2 sm:border-4 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl backdrop-blur-sm"
+            style={{ background: 'rgba(255, 253, 250, 0.15)', borderColor: 'rgba(255, 255, 255, 0.2)' }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
@@ -284,8 +308,8 @@ export default function Dashboard() {
           </motion.div>
 
           <motion.div 
-            className="bg-gradient-to-br dark:bg-gradient-to-br dark:from-accent-emerald/50 dark:via-accent-teal/50 dark:to-accent-cyan/50 border-2 sm:border-4 dark:border-accent-emerald/70 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl"
-            style={{ background: 'linear-gradient(to bottom right, rgba(255, 253, 250, 0.5), rgba(255, 248, 240, 0.5), rgba(255, 245, 238, 0.5))', borderColor: 'rgba(139, 69, 19, 0.4)' }}
+            className="border-2 sm:border-4 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl backdrop-blur-sm"
+            style={{ background: 'rgba(255, 253, 250, 0.15)', borderColor: 'rgba(255, 255, 255, 0.2)' }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.2 }}
@@ -302,8 +326,8 @@ export default function Dashboard() {
           </motion.div>
 
           <motion.div 
-            className="bg-gradient-to-br dark:bg-gradient-to-br dark:from-accent-rose/50 dark:via-accent-pink/50 dark:to-accent-fuchsia/50 border-2 sm:border-4 dark:border-accent-rose/70 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl sm:col-span-2 lg:col-span-1"
-            style={{ background: 'linear-gradient(to bottom right, rgba(255, 240, 245, 0.5), rgba(255, 228, 230, 0.5), rgba(255, 218, 225, 0.5))', borderColor: 'rgba(251, 182, 206, 0.5)' }}
+            className="border-2 sm:border-4 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl sm:col-span-2 lg:col-span-1 backdrop-blur-sm"
+            style={{ background: 'rgba(255, 240, 245, 0.15)', borderColor: 'rgba(255, 255, 255, 0.2)' }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.3 }}
@@ -390,7 +414,8 @@ export default function Dashboard() {
               {monthlyData.map((item, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between p-3 sm:p-4 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl"
+                  className="flex items-center justify-between p-3 sm:p-4 border rounded-lg sm:rounded-xl backdrop-blur-sm"
+                  style={{ background: 'rgba(0, 0, 0, 0.2)', borderColor: 'rgba(255, 255, 255, 0.2)' }}
                 >
                   <div className="flex items-center space-x-2 sm:space-x-3">
                     <div
@@ -449,7 +474,8 @@ export default function Dashboard() {
               return (
                 <div
                   key={monthData.month}
-                  className="p-3 sm:p-4 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl"
+                  className="p-3 sm:p-4 border rounded-lg sm:rounded-xl backdrop-blur-sm"
+                  style={{ background: 'rgba(0, 0, 0, 0.2)', borderColor: 'rgba(255, 255, 255, 0.2)' }}
                 >
                   <div className="flex items-center justify-between mb-2 sm:mb-3">
                     <h3 className="text-base sm:text-lg lg:text-xl font-bold dark:text-dark-text light:text-light-text">
@@ -524,6 +550,6 @@ export default function Dashboard() {
           </div>
         )}
         </AnimatedCard>
-    </div>
+      </div>
   )
 }

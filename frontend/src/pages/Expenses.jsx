@@ -1,9 +1,11 @@
 import { useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import api from '../utils/api'
+import { useLocation } from 'react-router-dom'
+import { listExpenses, addExpense, deleteExpense } from '../utils/expenses'
+import { getSettings } from '../utils/settings'
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
-import { FaEdit, FaTrash, FaPlus } from 'react-icons/fa'
+import { FaEdit, FaTrash, FaPlus, FaChevronDown, FaChevronUp } from 'react-icons/fa'
 import { AnimatedCard } from '../components/ui/AnimatedCard'
 import { AnimatedButton } from '../components/ui/AnimatedButton'
 import { AnimatedModal } from '../components/ui/AnimatedModal'
@@ -12,6 +14,8 @@ import { SkeletonLoader } from '../components/ui/SkeletonLoader'
 
 export default function Expenses() {
   const { user } = useAuth()
+  const location = useLocation()
+  const isExpenses = location.pathname === '/expenses'
   const [expenses, setExpenses] = useState([])
   const [loading, setLoading] = useState(true)
   const [settings, setSettings] = useState(null)
@@ -23,6 +27,7 @@ export default function Expenses() {
   })
   const [submitting, setSubmitting] = useState(false)
   const [deletingIds, setDeletingIds] = useState(new Set())
+  const [expandedPersons, setExpandedPersons] = useState(new Set())
 
   // Get persons from settings (fallback to empty array if not loaded yet)
   const persons = settings?.persons || []
@@ -41,8 +46,8 @@ export default function Expenses() {
 
   const fetchExpenses = async () => {
     try {
-      const response = await api.get('/expenses')
-      setExpenses(response.data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)))
+      const data = await listExpenses()
+      setExpenses(data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)))
     } catch (error) {
       console.error('Error fetching expenses:', error)
     } finally {
@@ -52,8 +57,8 @@ export default function Expenses() {
 
   const fetchSettings = async () => {
     try {
-      const response = await api.get('/settings')
-      setSettings(response.data)
+      const data = await getSettings()
+      setSettings(data)
     } catch (error) {
       console.error('Error fetching settings:', error)
     }
@@ -88,16 +93,21 @@ export default function Expenses() {
     try {
       if (editingExpense) {
         // For now, delete and recreate since there's no update endpoint
-        await api.delete(`/expenses/${editingExpense.id}`)
+        await deleteExpense(editingExpense.id)
       }
       
-      const response = await api.post('/expenses', expenseData)
+      const response = await addExpense(expenseData)
       
       // Replace optimistic update with real data
       if (!editingExpense && tempId) {
         setExpenses(prev => {
           const filtered = prev.filter(e => e.id !== tempId)
-          return [response.data, ...filtered].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+          return [response, ...filtered].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        })
+      } else if (editingExpense) {
+        setExpenses(prev => {
+          const filtered = prev.filter(e => e.id !== editingExpense.id)
+          return [response, ...filtered].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
         })
       } else {
         fetchExpenses()
@@ -112,7 +122,7 @@ export default function Expenses() {
       if (!editingExpense && tempId) {
         setExpenses(prev => prev.filter(e => e.id !== tempId))
       }
-      alert(error.response?.data?.detail || 'Failed to save expense')
+      alert(error.message || 'Failed to save expense')
     } finally {
       setSubmitting(false)
     }
@@ -145,14 +155,14 @@ export default function Expenses() {
     setDeletingIds(prev => new Set(prev).add(id))
     
     try {
-      await api.delete(`/expenses/${id}`)
+      await deleteExpense(id)
     } catch (error) {
       console.error('Error deleting expense:', error)
       // Revert optimistic update on error
       if (expenseToDelete) {
         setExpenses(prev => [...prev, expenseToDelete].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)))
       }
-      alert(error.response?.data?.detail || 'Failed to delete expense')
+      alert(error.message || 'Failed to delete expense')
     } finally {
       setDeletingIds(prev => {
         const next = new Set(prev)
@@ -162,8 +172,22 @@ export default function Expenses() {
     }
   }
 
+  // Helper function to check if two names represent the same person (handles partial matches)
+  const isSamePersonName = (name1, name2) => {
+    if (!name1 || !name2) return false
+    const norm1 = name1.toLowerCase().trim().replace(/\s+/g, '')
+    const norm2 = name2.toLowerCase().trim().replace(/\s+/g, '')
+    if (norm1 === norm2) return true
+    // Check if one starts with the other (for "Dinesh" vs "Dinesh Nampally")
+    if (norm1.length >= 3 && norm2.length >= 3) {
+      return norm1.startsWith(norm2) || norm2.startsWith(norm1)
+    }
+    return false
+  }
+
   const getExpensesForPerson = (person) => {
-    return expenses.filter(e => e.person.toLowerCase() === person.toLowerCase())
+    // Include expenses that match the person name exactly or partially
+    return expenses.filter(e => isSamePersonName(e.person, person))
   }
 
   const getTotalForPerson = (person) => {
@@ -171,19 +195,144 @@ export default function Expenses() {
   }
 
   // Get all unique person names from expenses and merge with settings persons
+  // Normalize to avoid duplicates (case-insensitive) and handle partial matches
   const allPersons = useMemo(() => {
-    const expensePersons = [...new Set(expenses.map(e => e.person))]
-    const settingsPersons = persons || []
-    // Merge and deduplicate (case-insensitive)
-    const merged = [...new Set([...settingsPersons, ...expensePersons])]
-    // Sort: settings persons first, then others
-    return merged.sort((a, b) => {
-      const aInSettings = settingsPersons.some(p => p.toLowerCase() === a.toLowerCase())
-      const bInSettings = settingsPersons.some(p => p.toLowerCase() === b.toLowerCase())
+    const settingsPersons = Array.isArray(persons) ? persons.filter(p => p && typeof p === 'string').map(p => p.trim()) : []
+    const expensePersons = Array.isArray(expenses) ? expenses.map(e => e.person).filter(p => p && typeof p === 'string').map(p => p.trim()) : []
+    
+    // Normalize function - remove all whitespace and convert to lowercase
+    const normalize = (name) => {
+      if (!name || typeof name !== 'string') return ''
+      return name.toLowerCase().trim().replace(/\s+/g, ' ')
+    }
+    
+    // Check if two names are the same person (handles partial matches)
+    const isSamePerson = (name1, name2) => {
+      const norm1 = normalize(name1)
+      const norm2 = normalize(name2)
+      if (norm1 === norm2) return true
+      // Check if one is a substring of another (for "Dinesh" vs "Dinesh Nampally")
+      if (norm1.length > 0 && norm2.length > 0) {
+        // Remove spaces for comparison to handle "Dinesh" vs "Dinesh Nampally"
+        const norm1NoSpaces = norm1.replace(/\s+/g, '')
+        const norm2NoSpaces = norm2.replace(/\s+/g, '')
+        // Check if one starts with the other (and the shorter one is at least 3 chars)
+        if (norm1NoSpaces.length >= 3 && norm2NoSpaces.length >= 3) {
+          if (norm1NoSpaces.startsWith(norm2NoSpaces) || norm2NoSpaces.startsWith(norm1NoSpaces)) {
+            return true
+          }
+        }
+      }
+      return false
+    }
+    
+    // Find the best canonical name for a person
+    const findCanonicalName = (name, allNames) => {
+      // First, check if it matches a settings person exactly or partially
+      const matchingSettingsPerson = settingsPersons.find(p => isSamePerson(p, name))
+      if (matchingSettingsPerson) return matchingSettingsPerson
+      
+      // Then, check if it matches any other name we've seen (prefer longer/more complete names)
+      const matchingName = allNames.find(p => isSamePerson(p, name) && p.length > name.length)
+      if (matchingName) return matchingName
+      
+      // Otherwise, use the name itself
+      return name
+    }
+    
+    // Map to store: normalized -> canonical name
+    const personMap = new Map()
+    const allNamesList = [...settingsPersons, ...expensePersons]
+    
+    // Process all names and merge duplicates
+    allNamesList.forEach(person => {
+      if (!person || typeof person !== 'string') return
+      
+      const normalized = normalize(person)
+      if (!normalized) return
+      
+      // Find the canonical name for this person
+      const canonicalName = findCanonicalName(person, Array.from(personMap.values()))
+      
+      // Check if we already have this person (by checking all existing entries)
+      let found = false
+      for (const [existingNorm, existingCanonical] of personMap.entries()) {
+        if (isSamePerson(existingCanonical, canonicalName)) {
+          found = true
+          // Update to use the better canonical name (prefer settings name, then longer name)
+          const betterName = settingsPersons.find(p => isSamePerson(p, canonicalName)) || 
+                           (canonicalName.length > existingCanonical.length ? canonicalName : existingCanonical)
+          personMap.set(existingNorm, betterName)
+          break
+        }
+      }
+      
+      if (!found) {
+        personMap.set(normalized, canonicalName)
+      }
+    })
+    
+    // Final deduplication: merge any remaining duplicates
+    const finalMap = new Map()
+    const processed = new Set()
+    
+    personMap.forEach((canonicalName, normalized) => {
+      // Skip if we've already processed this person
+      if (processed.has(normalized)) return
+      
+      // Find all entries that represent the same person
+      const samePersonEntries = []
+      personMap.forEach((otherName, otherNorm) => {
+        if (isSamePerson(canonicalName, otherName)) {
+          samePersonEntries.push({ norm: otherNorm, name: otherName })
+        }
+      })
+      
+      // Choose the best canonical name (prefer settings, then longer name)
+      let bestName = canonicalName
+      for (const entry of samePersonEntries) {
+        const settingsMatch = settingsPersons.find(p => isSamePerson(p, entry.name))
+        if (settingsMatch) {
+          bestName = settingsMatch
+          break
+        }
+        if (entry.name.length > bestName.length) {
+          bestName = entry.name
+        }
+      }
+      
+      // Use a consistent normalized key for the same person
+      const consistentNorm = normalize(bestName)
+      if (!finalMap.has(consistentNorm)) {
+        finalMap.set(consistentNorm, bestName)
+      }
+      
+      // Mark all same person entries as processed
+      samePersonEntries.forEach(entry => processed.add(entry.norm))
+    })
+    
+    const finalResult = Array.from(finalMap.values())
+    
+    // Sort: settings persons first, then others alphabetically
+    const settingsNormalized = new Set(settingsPersons.map(normalize))
+    const sorted = finalResult.sort((a, b) => {
+      const aNorm = normalize(a)
+      const bNorm = normalize(b)
+      const aInSettings = settingsNormalized.has(aNorm)
+      const bInSettings = settingsNormalized.has(bNorm)
       if (aInSettings && !bInSettings) return -1
       if (!aInSettings && bInSettings) return 1
       return a.localeCompare(b)
     })
+    
+    // Debug: log if we find duplicates
+    const normalizedInResult = sorted.map(normalize)
+    const uniqueNormalized = new Set(normalizedInResult)
+    if (normalizedInResult.length !== uniqueNormalized.size) {
+      console.warn('Duplicate persons detected after deduplication:', sorted)
+    }
+    
+    return sorted
   }, [expenses, persons])
 
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0)
@@ -239,7 +388,10 @@ export default function Expenses() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft"
+            className={`border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft backdrop-blur-sm ${
+              isExpenses ? '' : 'dark:bg-dark-surface light:bg-light-surface dark:border-dark-border light:border-light-border'
+            }`}
+            style={isExpenses ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
           >
             <h2 className="text-lg sm:text-xl lg:text-2xl font-bold dark:text-dark-text light:text-light-text mb-4 sm:mb-6">
               {editingExpense ? 'Edit Expense' : 'Add New Expense'} - {loggedInPersonFormatted}
@@ -257,7 +409,9 @@ export default function Expenses() {
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 required
                 whileFocus={{ scale: 1.01, boxShadow: "0 0 0 3px rgba(94, 58, 255, 0.2)" }}
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all"
+                className={`w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all ${
+                  isExpenses ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card dark:border-dark-border light:border-light-border'
+                }`}
                 placeholder="Enter amount"
               />
             </div>
@@ -270,7 +424,9 @@ export default function Expenses() {
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 whileFocus={{ scale: 1.01, boxShadow: "0 0 0 3px rgba(94, 58, 255, 0.2)" }}
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all"
+                className={`w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all ${
+                  isExpenses ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card dark:border-dark-border light:border-light-border'
+                }`}
                 placeholder="Enter description (optional)"
               />
             </div>
@@ -307,35 +463,50 @@ export default function Expenses() {
       {/* Person Boxes */}
       <ScrollReveal>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {allPersons.map((person, index) => {
-          const personExpenses = getExpensesForPerson(person)
-          const personTotal = getTotalForPerson(person)
-          const isLoggedInPerson = person.toLowerCase() === loggedInPerson.toLowerCase()
-          
-          // Assign different vibrant colors to each person (cycle through colors if more than 3)
-          const colorPalettes = [
-            { bg: 'bg-gradient-to-br from-accent-indigo/40 via-accent-violet/40 to-accent-fuchsia/40 dark:from-accent-indigo/50 dark:via-accent-violet/50 dark:to-accent-fuchsia/50', border: 'border-2 sm:border-4 border-accent-indigo/60', text: 'from-accent-indigo via-accent-violet to-accent-fuchsia' },
-            { bg: 'bg-gradient-to-br from-accent-emerald/40 via-accent-teal/40 to-accent-cyan/40 dark:from-accent-emerald/50 dark:via-accent-teal/50 dark:to-accent-cyan/50', border: 'border-2 sm:border-4 border-accent-emerald/60', text: 'from-accent-emerald via-accent-teal to-accent-cyan' },
-            { bg: 'bg-gradient-to-br from-accent-rose/40 via-accent-pink/40 to-accent-fuchsia/40 dark:from-accent-rose/50 dark:via-accent-pink/50 dark:to-accent-fuchsia/50', border: 'border-2 sm:border-4 border-accent-rose/60', text: 'from-accent-rose via-accent-pink to-accent-fuchsia' },
-            { bg: 'bg-gradient-to-br from-accent-sky/40 via-accent-blue/40 to-accent-indigo/40 dark:from-accent-sky/50 dark:via-accent-blue/50 dark:to-accent-indigo/50', border: 'border-2 sm:border-4 border-accent-sky/60', text: 'from-accent-sky via-accent-blue to-accent-indigo' },
-            { bg: 'bg-gradient-to-br from-accent-yellow/40 via-accent-amber/40 to-accent-orange/40 dark:from-accent-yellow/50 dark:via-accent-amber/50 dark:to-accent-orange/50', border: 'border-2 sm:border-4 border-accent-yellow/60', text: 'from-accent-yellow via-accent-amber to-accent-orange' },
-            { bg: 'bg-gradient-to-br from-accent-purple/40 via-accent-violet/40 to-accent-fuchsia/40 dark:from-accent-purple/50 dark:via-accent-violet/50 dark:to-accent-fuchsia/50', border: 'border-2 sm:border-4 border-accent-purple/60', text: 'from-accent-purple via-accent-violet to-accent-fuchsia' },
-          ]
-          const colorIndex = index % colorPalettes.length
-          const colorClass = colorPalettes[colorIndex].bg
-          const borderClass = colorPalettes[colorIndex].border
-          const textGradient = colorPalettes[colorIndex].text
-
-          return (
+          {allPersons
+            .filter((person, index, self) => {
+              // Additional safety filter to remove any duplicates at render time
+              const normalized = person.toLowerCase().trim()
+              return self.findIndex(p => p.toLowerCase().trim() === normalized) === index
+            })
+            .map((person, index) => {
+              const personExpenses = getExpensesForPerson(person)
+              const personTotal = getTotalForPerson(person)
+              const isLoggedInPerson = person.toLowerCase() === loggedInPerson.toLowerCase()
+              
+              // Normalize person name for key to ensure uniqueness
+              const normalizedPersonKey = person.toLowerCase().trim()
+              
+              // Assign different vibrant colors to each person (cycle through colors if more than 3)
+              const opacity = isExpenses ? '20' : '40'
+              const darkOpacity = isExpenses ? '30' : '50'
+              const borderOpacity = isExpenses ? '40' : '60'
+              const colorPalettes = [
+                { bg: `bg-gradient-to-br from-accent-indigo/${opacity} via-accent-violet/${opacity} to-accent-fuchsia/${opacity} dark:from-accent-indigo/${darkOpacity} dark:via-accent-violet/${darkOpacity} dark:to-accent-fuchsia/${darkOpacity}`, border: `border-2 sm:border-4 border-accent-indigo/${borderOpacity}`, text: 'from-accent-indigo via-accent-violet to-accent-fuchsia' },
+                { bg: `bg-gradient-to-br from-accent-emerald/${opacity} via-accent-teal/${opacity} to-accent-cyan/${opacity} dark:from-accent-emerald/${darkOpacity} dark:via-accent-teal/${darkOpacity} dark:to-accent-cyan/${darkOpacity}`, border: `border-2 sm:border-4 border-accent-emerald/${borderOpacity}`, text: 'from-accent-emerald via-accent-teal to-accent-cyan' },
+                { bg: `bg-gradient-to-br from-accent-rose/${opacity} via-accent-pink/${opacity} to-accent-fuchsia/${opacity} dark:from-accent-rose/${darkOpacity} dark:via-accent-pink/${darkOpacity} dark:to-accent-fuchsia/${darkOpacity}`, border: `border-2 sm:border-4 border-accent-rose/${borderOpacity}`, text: 'from-accent-rose via-accent-pink to-accent-fuchsia' },
+                { bg: `bg-gradient-to-br from-accent-sky/${opacity} via-accent-blue/${opacity} to-accent-indigo/${opacity} dark:from-accent-sky/${darkOpacity} dark:via-accent-blue/${darkOpacity} dark:to-accent-indigo/${darkOpacity}`, border: `border-2 sm:border-4 border-accent-sky/${borderOpacity}`, text: 'from-accent-sky via-accent-blue to-accent-indigo' },
+                { bg: `bg-gradient-to-br from-accent-yellow/${opacity} via-accent-amber/${opacity} to-accent-orange/${opacity} dark:from-accent-yellow/${darkOpacity} dark:via-accent-amber/${darkOpacity} dark:to-accent-orange/${darkOpacity}`, border: `border-2 sm:border-4 border-accent-yellow/${borderOpacity}`, text: 'from-accent-yellow via-accent-amber to-accent-orange' },
+                { bg: `bg-gradient-to-br from-accent-purple/${opacity} via-accent-violet/${opacity} to-accent-fuchsia/${opacity} dark:from-accent-purple/${darkOpacity} dark:via-accent-violet/${darkOpacity} dark:to-accent-fuchsia/${darkOpacity}`, border: `border-2 sm:border-4 border-accent-purple/${borderOpacity}`, text: 'from-accent-purple via-accent-violet to-accent-fuchsia' },
+              ]
+              const colorIndex = index % colorPalettes.length
+              const colorClass = colorPalettes[colorIndex].bg
+              const borderClass = colorPalettes[colorIndex].border
+              const textGradient = colorPalettes[colorIndex].text
+              // For expenses page, use consistent border styling
+              const borderClassFinal = isExpenses ? 'border-2 sm:border-4 border-white/15' : borderClass
+              
+              return (
             <motion.div
-              key={person}
+              key={`person-${normalizedPersonKey}-${index}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.1 }}
               whileHover={{ scale: 1.02, boxShadow: "0 12px 24px rgba(0, 0, 0, 0.2)" }}
-              className={`${colorClass} ${borderClass} dark:bg-gradient-to-br light:bg-gradient-to-br rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 ${
+              className={`${isExpenses ? '' : colorClass} ${borderClassFinal} ${isExpenses ? 'bg-transparent/10' : 'dark:bg-gradient-to-br light:bg-gradient-to-br'} rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 backdrop-blur-sm ${
                 isLoggedInPerson ? 'ring-2 sm:ring-4 ring-accent-yellow/50 shadow-accent-yellow/30' : ''
               }`}
+              style={isExpenses ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
             >
               <div className="flex items-center justify-between mb-3 sm:mb-4">
                 <h2 className={`text-xl sm:text-2xl lg:text-3xl font-extrabold bg-gradient-to-r ${textGradient} bg-clip-text text-transparent`}>{person}</h2>
@@ -358,11 +529,11 @@ export default function Expenses() {
               ) : (
                 <div className="space-y-2 sm:space-y-3">
                   <AnimatePresence>
-                    {personExpenses.map((expense, expenseIdx) => (
+                    {(expandedPersons.has(normalizedPersonKey) ? personExpenses : personExpenses.slice(0, 1)).map((expense, expenseIdx) => (
                       <AnimatedCard
                         key={expense.id}
                         delay={expenseIdx * 0.03}
-                        className={`p-3 sm:p-4 ${borderClass.replace('border-2 sm:border-4', 'border-2').replace('/60', '/40 dark:border-opacity-50')}`}
+                        className={`p-3 sm:p-4 ${isExpenses ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : ''} ${borderClass.replace('border-2 sm:border-4', 'border-2').replace('/60', '/40 dark:border-opacity-50')}`}
                       >
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="flex-1 min-w-0">
@@ -414,11 +585,43 @@ export default function Expenses() {
                       </AnimatedCard>
                     ))}
                   </AnimatePresence>
+                  {personExpenses.length > 1 && (
+                    <motion.button
+                      onClick={() => {
+                        const newExpanded = new Set(expandedPersons)
+                        if (newExpanded.has(normalizedPersonKey)) {
+                          newExpanded.delete(normalizedPersonKey)
+                        } else {
+                          newExpanded.add(normalizedPersonKey)
+                        }
+                        setExpandedPersons(newExpanded)
+                      }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className={`w-full py-2 sm:py-2.5 px-4 rounded-lg font-semibold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 ${
+                        isExpenses 
+                          ? 'bg-transparent/10 backdrop-blur-sm border border-white/15 text-white hover:bg-transparent/20' 
+                          : 'bg-gradient-to-r from-accent-indigo to-accent-purple text-white hover:from-accent-purple hover:to-accent-indigo'
+                      }`}
+                    >
+                      {expandedPersons.has(normalizedPersonKey) ? (
+                        <>
+                          <span>Show Less</span>
+                          <FaChevronUp className="w-3 h-3" />
+                        </>
+                      ) : (
+                        <>
+                          <span>See All ({personExpenses.length - 1} more)</span>
+                          <FaChevronDown className="w-3 h-3" />
+                        </>
+                      )}
+                    </motion.button>
+                  )}
                 </div>
               )}
             </motion.div>
-          )
-        })}
+              )
+            })}
         </div>
       </ScrollReveal>
 

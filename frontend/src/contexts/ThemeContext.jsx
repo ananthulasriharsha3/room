@@ -5,10 +5,10 @@ const ThemeContext = createContext(null)
 // Color scheme definitions
 export const colorSchemes = {
   default: {
-    name: 'Default',
-    primary: '#5e3aff',      // Deep indigo
-    secondary: '#8b2eff',    // Electric violet
-    accent: '#0066ff',       // Electric blue
+    name: 'Stranger Things',
+    primary: '#E50914',      // Primary Red (Stranger Things)
+    secondary: '#B1060F',    // Deep Blood Red
+    accent: '#3A8DFF',       // Accent Neon Blue (upside-down glow)
     gradient: 'from-accent-indigo via-accent-violet to-accent-fuchsia',
   },
   ocean: {
@@ -35,21 +35,38 @@ export const colorSchemes = {
 }
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem('theme')
-    return saved || 'dark'
-  })
+  // Always use dark mode - no theme switching
+  const [theme, setTheme] = useState('dark')
 
   const [colorScheme, setColorScheme] = useState(() => {
     const saved = localStorage.getItem('colorScheme')
     return saved || 'default'
   })
 
+  const [upsideDown, setUpsideDown] = useState(() => {
+    const saved = localStorage.getItem('upsideDown')
+    return saved === 'true'
+  })
+
   useEffect(() => {
-    localStorage.setItem('theme', theme)
-    document.documentElement.classList.remove('light', 'dark')
-    document.documentElement.classList.add(theme)
+    // Force dark mode always
+    localStorage.setItem('theme', 'dark')
+    document.documentElement.classList.remove('light')
+    document.documentElement.classList.add('dark')
   }, [theme])
+
+  useEffect(() => {
+    localStorage.setItem('upsideDown', upsideDown.toString())
+    if (upsideDown) {
+      document.documentElement.classList.add('upside-down')
+    } else {
+      document.documentElement.classList.remove('upside-down')
+    }
+  }, [upsideDown])
+
+  const toggleUpsideDown = () => {
+    setUpsideDown(prev => !prev)
+  }
 
   // Function to apply color scheme to CSS variables
   const applyColorSchemeToCSS = (scheme) => {
@@ -307,7 +324,8 @@ export function ThemeProvider({ children }) {
   }
 
   const toggleTheme = () => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark')
+    // Theme toggle disabled - always dark mode
+    // setTheme(prev => prev === 'dark' ? 'light' : 'dark')
   }
 
   const applyColorScheme = (schemeName) => {
@@ -325,6 +343,13 @@ export function ThemeProvider({ children }) {
     // Update state to trigger re-render
     setColorScheme('custom')
   }
+
+  // Force dark mode on mount
+  useEffect(() => {
+    document.documentElement.classList.remove('light')
+    document.documentElement.classList.add('dark')
+    localStorage.setItem('theme', 'dark')
+  }, [])
 
   // Initialize and apply color scheme on mount and when colorScheme changes
   useEffect(() => {
@@ -368,7 +393,9 @@ export function ThemeProvider({ children }) {
       colorScheme, 
       applyColorScheme,
       applyCustomTheme,
-      colorSchemes 
+      colorSchemes,
+      upsideDown,
+      toggleUpsideDown
     }}>
       {children}
     </ThemeContext.Provider>

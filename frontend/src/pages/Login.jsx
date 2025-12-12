@@ -2,16 +2,14 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
-import api from '../utils/api'
-import { FaMoon, FaSun } from 'react-icons/fa'
-
+import { loginUser } from '../utils/auth'
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { login, user } = useAuth()
-  const { theme, toggleTheme } = useTheme()
+  const { theme } = useTheme()
   const navigate = useNavigate()
 
   // Navigate to dashboard when user is set (after successful login)
@@ -27,39 +25,108 @@ export default function Login() {
     setLoading(true)
 
     try {
-      const response = await api.post('/auth/login', {
-        email,
-        password,
-      })
-      
-      const { access_token, user } = response.data
+      const response = await loginUser(email, password)
+      const { access_token, user } = response
       login(access_token, user)
       // Navigation will happen automatically via useEffect when user state updates
       // Don't set loading to false here - let the redirect happen
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed. Please try again.')
+      setError(err.message || 'Login failed. Please try again.')
       setLoading(false)
     }
   }
 
+  useEffect(() => {
+    // Prevent body scrolling on login page and hide scrollbar
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    
+    // Hide veins layer and other theme effects
+    const veinsLayer = document.getElementById('veins-layer');
+    if (veinsLayer) veinsLayer.style.display = 'none';
+    const abyssBg = document.getElementById('abyss-bg');
+    if (abyssBg) abyssBg.style.display = 'none';
+    const spores = document.getElementById('spores-container');
+    if (spores) spores.style.display = 'none';
+    const ash = document.getElementById('ash-container');
+    if (ash) ash.style.display = 'none';
+    const fogs = document.querySelectorAll('.fog-layer');
+    fogs.forEach(fog => fog.style.display = 'none');
+    
+    // Remove shake classes immediately and continuously
+    const removeShakeClasses = () => {
+      document.body.classList.remove('camera-shake', 'frame-jitter', 'rgb-shift');
+      document.documentElement.classList.remove('camera-shake', 'frame-jitter', 'rgb-shift');
+      document.body.style.transform = 'translate3d(0, 0, 0)';
+      document.documentElement.style.transform = 'translate3d(0, 0, 0)';
+    };
+    removeShakeClasses();
+    
+    // Monitor and remove shake classes continuously
+    const shakeMonitor = setInterval(removeShakeClasses, 100);
+    
+    // Hide scrollbar, prevent shaking, and hide body pseudo-elements for GIF background
+    const style = document.createElement('style');
+    style.textContent = `
+      * { scrollbar-width: none !important; }
+      *::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+      body::-webkit-scrollbar { display: none !important; }
+      body { -ms-overflow-style: none !important; scrollbar-width: none !important; background: transparent !important; overflow: hidden !important; }
+      html::-webkit-scrollbar { display: none !important; }
+      html { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow: hidden !important; }
+      #veins-layer, .veins-layer, .vein { display: none !important; visibility: hidden !important; }
+      body, html { transform: translate3d(0, 0, 0) !important; animation: none !important; }
+      body.camera-shake, body.frame-jitter, body.rgb-shift { transform: translate3d(0, 0, 0) !important; animation: none !important; }
+      body::before, body::after { display: none !important; }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      clearInterval(shakeMonitor);
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      style.remove();
+    };
+  }, []);
+
   return (
-    <div className="min-h-screen dark:bg-dark-bg light:bg-light-bg flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="fixed inset-0 h-screen w-screen overflow-hidden flex items-center justify-center p-4 relative z-10" style={{ height: '100vh', width: '100vw' }}>
+      {/* GIF Background */}
+      <img 
+        src="/stranger things netflix GIF.gif"
+        alt=""
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          objectFit: 'cover',
+          zIndex: -1,
+          pointerEvents: 'none',
+          display: 'block'
+        }}
+      />
+      {/* Overlay for readability */}
+      <div 
+        style={{ 
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'rgba(0, 0, 0, 0.1)',
+          zIndex: -1,
+          pointerEvents: 'none'
+        }}
+      />
+      
+      <div className="w-full max-w-md relative z-10 overflow-y-auto max-h-[calc(100vh-2rem)]" style={{ maxHeight: 'calc(100vh - 2rem)' }}>
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-lg dark:bg-dark-card light:bg-light-card dark:text-dark-text light:text-light-text hover:opacity-80 transition-opacity"
-              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {theme === 'dark' ? <FaSun className="w-5 h-5" /> : <FaMoon className="w-5 h-5" />}
-            </button>
-          </div>
-          <h1 className="text-4xl font-bold dark:text-dark-text light:text-light-text mb-2">Room Duty</h1>
-          <p className="dark:text-dark-text-secondary light:text-light-text-secondary">Sign in to your account</p>
+          <h1 className="text-4xl font-bold text-white mb-2">Room Duty</h1>
+          <p className="text-white/80">Sign in to your account</p>
         </div>
 
-        <div className="dark:bg-gradient-to-br dark:from-dark-surface dark:via-dark-card dark:to-dark-surface light:bg-gradient-to-br light:from-light-surface light:via-light-card light:to-light-surface border-2 dark:border-accent-blue/30 light:border-accent-blue/20 rounded-2xl p-8 shadow-2xl backdrop-blur-sm">
+        <div className="bg-transparent/10 backdrop-blur-sm border-2 border-white/15 rounded-2xl p-8 shadow-2xl" style={{ background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' }}>
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
               <div className="bg-red-500/10 border border-red-500 dark:text-red-300 light:text-red-600 px-4 py-3 rounded-xl text-sm">
@@ -68,7 +135,7 @@ export default function Login() {
             )}
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium dark:text-dark-text-secondary light:text-light-text-secondary mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-white/90 mb-2">
                 Email
               </label>
               <input
@@ -78,20 +145,14 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
-                data-theme={theme}
-                className={`w-full px-4 py-3 border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text placeholder:dark:text-dark-text-tertiary placeholder:light:text-light-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue/50 transition-all ${theme === 'dark' ? 'email-dark-bg' : 'email-light-bg'}`}
+                className="w-full px-4 py-3 bg-transparent/10 backdrop-blur-sm border border-white/15 rounded-xl text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/30 transition-all"
                 placeholder="you@example.com"
-                style={{
-                  backgroundColor: theme === 'dark' ? '#252550' : '#f8faff',
-                  color: theme === 'dark' ? '#ffffff' : '#1e293b',
-                  WebkitTextFillColor: theme === 'dark' ? '#ffffff' : '#1e293b',
-                  borderColor: theme === 'dark' ? '#3a3a6a' : '#e0e7ff'
-                }}
+                style={{ background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' }}
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium dark:text-dark-text-secondary light:text-light-text-secondary mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-white/90 mb-2">
                 Password
               </label>
               <input
@@ -101,10 +162,11 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="w-full px-4 py-3 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-xl dark:text-dark-text light:text-light-text placeholder:dark:text-dark-text-tertiary placeholder:light:text-light-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue/50 transition-all"
+                className="w-full px-4 py-3 bg-transparent/10 backdrop-blur-sm border border-white/15 rounded-xl text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/30 transition-all"
+                style={{ background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' }}
                 placeholder="••••••••"
                 style={{
-                  ...(theme === 'dark' && { backgroundColor: '#1F2937' }),
+                  ...(theme === 'dark' && { backgroundColor: '#2a2a2a' }),
                   color: 'inherit',
                   WebkitTextFillColor: 'inherit'
                 }}
@@ -114,16 +176,16 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-accent-sky via-accent-blue to-accent-indigo text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-accent-sky/30 hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="btn-stranger w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
 
           <div className="mt-6 text-center">
-            <p className="dark:text-dark-text-secondary light:text-light-text-secondary text-sm">
+            <p className="text-white/80 text-sm">
               Don't have an account?{' '}
-              <Link to="/register" className="dark:text-dark-text light:text-light-text font-semibold hover:underline">
+              <Link to="/register" className="text-white font-semibold hover:underline">
                 Sign up
               </Link>
             </p>

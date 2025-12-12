@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import api from '../utils/api'
+import { useLocation } from 'react-router-dom'
+import { listUsers, updateUserAccess } from '../utils/admin'
+import { getSettings, saveSettings } from '../utils/settings'
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { Navigate } from 'react-router-dom'
@@ -7,6 +9,8 @@ import { FaEdit, FaCheck, FaTimes, FaInfoCircle } from 'react-icons/fa'
 
 export default function AdminPanel() {
   const { user } = useAuth()
+  const location = useLocation()
+  const isAdmin = location.pathname === '/admin'
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [settings, setSettings] = useState(null)
@@ -33,8 +37,8 @@ export default function AdminPanel() {
 
   const fetchUsers = async () => {
     try {
-      const response = await api.get('/admin/users')
-      setUsers(response.data)
+      const data = await listUsers()
+      setUsers(data)
     } catch (error) {
       console.error('Error fetching users:', error)
     } finally {
@@ -44,11 +48,11 @@ export default function AdminPanel() {
 
   const fetchSettings = async () => {
     try {
-      const response = await api.get('/settings')
-      setSettings(response.data)
+      const data = await getSettings()
+      setSettings(data)
       setSettingsForm({
-        persons: response.data.persons || [],
-        tasks: response.data.tasks || [],
+        persons: data.persons || [],
+        tasks: data.tasks || [],
       })
     } catch (error) {
       console.error('Error fetching settings:', error)
@@ -68,9 +72,7 @@ export default function AdminPanel() {
     )
     
     try {
-      await api.post(`/admin/users/${userId}/access`, {
-        has_access: newAccess
-      })
+      await updateUserAccess(userId, newAccess)
       // Refresh to get server state (in case of any differences)
       fetchUsers()
     } catch (error) {
@@ -81,7 +83,7 @@ export default function AdminPanel() {
           u.id === userId ? { ...u, has_access: currentAccess } : u
         )
       )
-      alert(error.response?.data?.detail || 'Failed to update user access')
+      alert(error.message || 'Failed to update user access')
     } finally {
       setUpdatingUsers(prev => {
         const next = new Set(prev)
@@ -150,7 +152,7 @@ export default function AdminPanel() {
 
   const handleSaveSettings = async () => {
     try {
-      await api.post('/settings', settingsForm)
+      await saveSettings(settingsForm)
       fetchSettings()
       setShowSettingsForm(false)
       setShowSuccessMessage(true)
@@ -178,7 +180,9 @@ export default function AdminPanel() {
       </div>
 
       {/* User Management */}
-      <div className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft w-full max-w-full overflow-x-hidden">
+      <div className={`${isAdmin ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border'} rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft w-full max-w-full overflow-x-hidden`}
+      style={isAdmin ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
+      >
         <h2 className="text-lg sm:text-xl lg:text-2xl font-bold dark:text-dark-text light:text-light-text mb-3 sm:mb-4">User Management</h2>
         {users.length === 0 ? (
           <p className="dark:text-dark-text-secondary light:text-light-text-secondary text-sm sm:text-base">No users found</p>
@@ -187,7 +191,8 @@ export default function AdminPanel() {
             {users.map((u) => (
               <div
                 key={u.id}
-                className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 p-3 sm:p-4 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl w-full max-w-full overflow-x-hidden"
+                className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 p-3 sm:p-4 ${isAdmin ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg sm:rounded-xl w-full max-w-full overflow-x-hidden`}
+                style={isAdmin ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
               >
                 <div className="flex-1 min-w-0 max-w-full">
                   <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -252,7 +257,9 @@ export default function AdminPanel() {
       )}
 
       {/* Settings Management */}
-      <div className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft w-full max-w-full overflow-x-hidden">
+      <div className={`${isAdmin ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border'} rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft w-full max-w-full overflow-x-hidden`}
+      style={isAdmin ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
+      >
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
           <div className="flex-1 min-w-0 max-w-full">
             <h2 className="text-lg sm:text-xl lg:text-2xl font-bold dark:text-dark-text light:text-light-text break-words">Settings</h2>
@@ -281,7 +288,8 @@ export default function AdminPanel() {
                 {settings?.persons?.map((person) => (
                   <span
                     key={person}
-                    className="px-2 sm:px-3 py-1 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg dark:text-dark-text light:text-light-text text-xs sm:text-sm break-words"
+                    className={`px-2 sm:px-3 py-1 ${isAdmin ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg dark:text-dark-text light:text-light-text text-xs sm:text-sm break-words`}
+                    style={isAdmin ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
                   >
                     {person}
                   </span>
@@ -294,7 +302,8 @@ export default function AdminPanel() {
                 {settings?.tasks?.map((task) => (
                   <span
                     key={task}
-                    className="px-2 sm:px-3 py-1 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg dark:text-dark-text light:text-light-text text-xs sm:text-sm break-words"
+                    className={`px-2 sm:px-3 py-1 ${isAdmin ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg dark:text-dark-text light:text-light-text text-xs sm:text-sm break-words`}
+                    style={isAdmin ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
                   >
                     {task}
                   </span>
@@ -317,7 +326,8 @@ export default function AdminPanel() {
                   settingsForm.persons.map((person) => (
                     <div
                       key={person}
-                      className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg text-xs sm:text-sm max-w-full"
+                      className={`flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 ${isAdmin ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg text-xs sm:text-sm max-w-full`}
+                      style={isAdmin ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
                     >
                       {editingPerson === person ? (
                         <>
@@ -329,7 +339,8 @@ export default function AdminPanel() {
                               if (e.key === 'Enter') handleSavePersonEdit()
                               if (e.key === 'Escape') handleCancelPersonEdit()
                             }}
-                            className="flex-1 min-w-0 px-2 py-1 text-xs sm:text-sm dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded dark:text-dark-text light:text-light-text focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            className={`flex-1 min-w-0 px-2 py-1 text-xs sm:text-sm ${isAdmin ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border'} rounded dark:text-dark-text light:text-light-text focus:outline-none focus:ring-2 focus:ring-blue-500/50`}
+                            style={isAdmin ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
                             autoFocus
                             placeholder="Person name"
                           />
@@ -378,7 +389,8 @@ export default function AdminPanel() {
                   onChange={(e) => setNewPerson(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleAddPerson()}
                   placeholder="Add person name"
-                  className="flex-1 px-3 sm:px-4 py-2 text-sm sm:text-base dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 min-w-0"
+                  className={`flex-1 px-3 sm:px-4 py-2 text-sm sm:text-base ${isAdmin ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 min-w-0`}
+                  style={isAdmin ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
                 />
                 <button
                   onClick={handleAddPerson}
@@ -415,7 +427,8 @@ export default function AdminPanel() {
                   onChange={(e) => setNewTask(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleAddTask()}
                   placeholder="Add task"
-                  className="flex-1 px-3 sm:px-4 py-2 text-sm sm:text-base dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 min-w-0"
+                  className={`flex-1 px-3 sm:px-4 py-2 text-sm sm:text-base ${isAdmin ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 min-w-0`}
+                  style={isAdmin ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
                 />
                 <button
                   onClick={handleAddTask}

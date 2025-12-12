@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import api from '../utils/api'
 
 const AuthContext = createContext(null)
 
@@ -15,7 +14,6 @@ export function AuthProvider({ children }) {
       try {
         const parsedUser = JSON.parse(userData)
         setUser(parsedUser)
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`
       } catch (error) {
         console.error('Error parsing user data:', error)
         localStorage.removeItem('token')
@@ -28,14 +26,12 @@ export function AuthProvider({ children }) {
   const login = (token, userData) => {
     localStorage.setItem('token', token)
     localStorage.setItem('user', JSON.stringify(userData))
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`
     setUser(userData)
   }
 
   const logout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
-    delete api.defaults.headers.common['Authorization']
     setUser(null)
   }
 

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import api from '../utils/api'
+import { useSearchParams, useLocation } from 'react-router-dom'
+import { getDayNote, setDayNote, deleteDayNote } from '../utils/dayNotes'
 import { format, parseISO, getYear, getMonth, getDate, startOfYear, endOfYear, eachDayOfInterval } from 'date-fns'
 import { FaEdit, FaTrash, FaCalendarAlt } from 'react-icons/fa'
 
 export default function DayNotes() {
+  const location = useLocation()
+  const isNotes = location.pathname === '/notes'
   const [searchParams, setSearchParams] = useSearchParams()
   const urlDate = searchParams.get('date')
   const initialDate = urlDate || format(new Date(), 'yyyy-MM-dd')
@@ -97,8 +99,7 @@ export default function DayNotes() {
     setNote('')
     setExistingNote(null)
     try {
-      const response = await api.get(`/day-notes/${selectedDate}`)
-      const noteData = response.data
+      const noteData = await getDayNote(selectedDate)
       // Don't populate the note field - just track that it exists
       setExistingNote(noteData)
       
@@ -111,7 +112,7 @@ export default function DayNotes() {
         return prev
       })
     } catch (error) {
-      if (error.response?.status === 404) {
+      if (error.message && error.message.includes('not found')) {
         // No note exists for this date - that's fine
         setExistingNote(null)
         setNote('')
@@ -131,11 +132,7 @@ export default function DayNotes() {
 
     setSaving(true)
     try {
-      const response = await api.post('/day-notes', {
-        date: selectedDate,
-        note: note.trim(),
-      })
-      const savedNote = response.data
+      const savedNote = await setDayNote(selectedDate, note.trim())
       setExistingNote(savedNote)
       
       // Update or add note to the saved notes list
@@ -158,7 +155,7 @@ export default function DayNotes() {
       setEditingNoteDate(null)
     } catch (error) {
       console.error('Error saving note:', error)
-      alert(error.response?.data?.detail || 'Failed to save note')
+      alert(error.message || 'Failed to save note')
     } finally {
       setSaving(false)
     }
@@ -169,7 +166,7 @@ export default function DayNotes() {
     if (!confirm('Are you sure you want to delete this note?')) return
 
     try {
-      await api.delete(`/day-notes/${dateStr}`)
+      await deleteDayNote(dateStr)
       
       // Remove from saved notes list
       setSavedNotes((prev) => prev.filter(n => n.date !== dateStr))
@@ -212,7 +209,9 @@ export default function DayNotes() {
         <p className="text-sm sm:text-base dark:text-dark-text-secondary light:text-light-text-secondary break-words">Add notes for specific days</p>
       </div>
 
-      <div className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft w-full max-w-full overflow-x-hidden">
+      <div className={`${isNotes ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border'} rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft w-full max-w-full overflow-x-hidden`}
+      style={isNotes ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
+      >
         <div className="mb-4 sm:mb-6">
           <label className="block text-xs sm:text-sm font-medium dark:text-dark-text-secondary light:text-light-text-secondary mb-2">
             Select Date
@@ -228,7 +227,8 @@ export default function DayNotes() {
                 setExistingNote(null)
                 setEditingNoteDate(null)
               }}
-              className="flex-1 min-w-0 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all cursor-pointer"
+              className={`flex-1 min-w-0 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base ${isNotes ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all cursor-pointer`}
+              style={isNotes ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
             >
               {years.map((year) => (
                 <option key={year} value={year}>
@@ -247,7 +247,8 @@ export default function DayNotes() {
                 setExistingNote(null)
                 setEditingNoteDate(null)
               }}
-              className="flex-1 min-w-0 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all cursor-pointer"
+              className={`flex-1 min-w-0 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base ${isNotes ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all cursor-pointer`}
+              style={isNotes ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
             >
               {months.map((month, index) => (
                 <option key={index} value={index}>
@@ -266,7 +267,8 @@ export default function DayNotes() {
                 setExistingNote(null)
                 setEditingNoteDate(null)
               }}
-              className="flex-1 min-w-0 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all cursor-pointer"
+              className={`flex-1 min-w-0 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base ${isNotes ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all cursor-pointer`}
+              style={isNotes ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
             >
               {days.map((day) => (
                 <option key={day} value={day}>
@@ -293,7 +295,8 @@ export default function DayNotes() {
                 setSelectedDate(todayStr)
                 setSearchParams({ date: todayStr })
               }}
-              className="flex-shrink-0 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text hover:opacity-80 transition-opacity font-medium flex items-center justify-center gap-2"
+              className={`flex-shrink-0 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base ${isNotes ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text hover:opacity-80 transition-opacity font-medium flex items-center justify-center gap-2`}
+              style={isNotes ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
               title="Jump to today"
             >
               <FaCalendarAlt className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -316,7 +319,8 @@ export default function DayNotes() {
               minLength={1}
               maxLength={500}
               rows={6}
-              className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all resize-none"
+              className={`w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base ${isNotes ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all resize-none`}
+              style={isNotes ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
             />
             <p className="text-xs dark:text-dark-text-tertiary light:text-light-text-tertiary mt-1">
               {note.length}/500 characters
@@ -346,7 +350,9 @@ export default function DayNotes() {
 
       {/* Saved Notes List */}
       {savedNotes.length > 0 && (
-        <div className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft w-full max-w-full overflow-x-hidden">
+        <div className={`${isNotes ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border'} rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft w-full max-w-full overflow-x-hidden`}
+        style={isNotes ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
+        >
           <h2 className="text-xl sm:text-2xl font-bold dark:text-dark-text light:text-light-text mb-4 sm:mb-6">
             Saved Notes
           </h2>
@@ -354,9 +360,10 @@ export default function DayNotes() {
             {savedNotes.map((savedNote) => (
               <div
                 key={savedNote.date}
-                className={`dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl p-3 sm:p-4 transition-all ${
+                className={`${isNotes ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg sm:rounded-xl p-3 sm:p-4 transition-all ${
                   editingNoteDate === savedNote.date ? 'ring-2 ring-accent-cyan' : ''
                 }`}
+                style={isNotes ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
               >
                 <div className="flex items-start justify-between gap-3 sm:gap-4">
                   <div className="flex-1 min-w-0">

@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
-import api from '../utils/api'
+import { useLocation } from 'react-router-dom'
+import { listStockItems, addStockItem, endStockItem, deleteStockItem } from '../utils/stockItems'
 import { format, differenceInDays } from 'date-fns'
 import { motion } from 'framer-motion'
 
 export default function StockItems() {
+  const location = useLocation()
+  const isStock = location.pathname === '/stock'
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -18,8 +21,8 @@ export default function StockItems() {
 
   const fetchItems = async () => {
     try {
-      const response = await api.get('/stock-items')
-      setItems(response.data)
+      const data = await listStockItems()
+      setItems(data)
     } catch (error) {
       console.error('Error fetching stock items:', error)
     } finally {
@@ -30,26 +33,23 @@ export default function StockItems() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      await api.post('/stock-items', {
-        ...formData,
-        start_date: formData.start_date,
-      })
+      await addStockItem(formData.name, formData.start_date)
       setFormData({ name: '', start_date: format(new Date(), 'yyyy-MM-dd') })
       setShowAddForm(false)
       fetchItems()
     } catch (error) {
       console.error('Error adding stock item:', error)
-      alert(error.response?.data?.detail || 'Failed to add stock item')
+      alert(error.message || 'Failed to add stock item')
     }
   }
 
   const handleEndItem = async (itemId) => {
     try {
-      await api.post(`/stock-items/${itemId}/end`)
+      await endStockItem(itemId)
       fetchItems()
     } catch (error) {
       console.error('Error ending stock item:', error)
-      alert(error.response?.data?.detail || 'Failed to end stock item')
+      alert(error.message || 'Failed to end stock item')
     }
   }
 
@@ -57,11 +57,11 @@ export default function StockItems() {
     if (!confirm('Are you sure you want to delete this stock item?')) return
 
     try {
-      await api.delete(`/stock-items/${itemId}`)
+      await deleteStockItem(itemId)
       fetchItems()
     } catch (error) {
       console.error('Error deleting stock item:', error)
-      alert(error.response?.data?.detail || 'Failed to delete stock item')
+      alert(error.message || 'Failed to delete stock item')
     }
   }
 
@@ -92,7 +92,9 @@ export default function StockItems() {
       </div>
 
       {showAddForm && (
-        <div className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft w-full max-w-full overflow-x-hidden">
+        <div className={`${isStock ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border'} rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft w-full max-w-full overflow-x-hidden`}
+        style={isStock ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
+        >
           <h2 className="text-lg sm:text-xl lg:text-2xl font-bold dark:text-dark-text light:text-light-text mb-3 sm:mb-4">Add New Stock Item</h2>
           <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
             <div>
@@ -105,7 +107,8 @@ export default function StockItems() {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
                 maxLength={200}
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all"
+                className={`w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base ${isStock ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all`}
+                style={isStock ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
                 placeholder="e.g., Rice, Oil, etc."
               />
             </div>
@@ -118,12 +121,13 @@ export default function StockItems() {
                 value={formData.start_date}
                 onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
                 required
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all"
+                className={`w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base ${isStock ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg sm:rounded-xl dark:text-dark-text light:text-light-text dark:placeholder:text-dark-text-secondary light:placeholder:text-light-text-secondary focus:outline-none focus:ring-2 dark:focus:ring-white/50 light:focus:ring-blue-500/50 transition-all`}
+                style={isStock ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
               />
             </div>
             <button
               type="submit"
-              className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-accent-yellow via-accent-amber to-accent-orange text-white font-semibold rounded-lg sm:rounded-xl hover:shadow-lg hover:shadow-accent-yellow/30 hover:scale-105 transition-all"
+              className="btn-stranger w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base"
             >
               Add Item
             </button>
@@ -145,7 +149,8 @@ export default function StockItems() {
                   key={item.id}
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="relative dark:bg-dark-card light:bg-light-card rounded-lg sm:rounded-xl p-3 sm:p-4 w-full max-w-full overflow-x-hidden"
+                  className={`relative ${isStock ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card'} rounded-lg sm:rounded-xl p-3 sm:p-4 w-full max-w-full overflow-x-hidden`}
+                  style={isStock ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
                 >
                   {/* Blinking border animation */}
                   <motion.div
@@ -238,7 +243,9 @@ export default function StockItems() {
 
       {/* Inactive Items */}
       {inactiveItems.length > 0 && (
-        <div className="dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft w-full max-w-full overflow-x-hidden">
+        <div className={`${isStock ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-surface light:bg-light-surface border dark:border-dark-border light:border-light-border'} rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-soft w-full max-w-full overflow-x-hidden`}
+        style={isStock ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
+        >
           <h2 className="text-lg sm:text-xl lg:text-2xl font-bold dark:text-dark-text light:text-light-text mb-3 sm:mb-4">Inactive Items ({inactiveItems.length})</h2>
           <div className="space-y-2 sm:space-y-3">
             {inactiveItems.map((item) => {
@@ -248,7 +255,8 @@ export default function StockItems() {
               return (
                 <div
                   key={item.id}
-                  className="dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border rounded-lg sm:rounded-xl p-3 sm:p-4 opacity-60 w-full max-w-full overflow-x-hidden"
+                  className={`${isStock ? 'bg-transparent/10 backdrop-blur-sm border-white/15' : 'dark:bg-dark-card light:bg-light-card border dark:border-dark-border light:border-light-border'} rounded-lg sm:rounded-xl p-3 sm:p-4 opacity-60 w-full max-w-full overflow-x-hidden`}
+                  style={isStock ? { background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' } : {}}
                 >
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
                     <div className="flex-1 min-w-0 max-w-full">

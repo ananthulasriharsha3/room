@@ -1,11 +1,20 @@
+@import './stranger-theme/theme.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Stranger Things Cinematic Theme */
+
 :root {
-  --theme-primary: #5e3aff;
-  --theme-secondary: #8b2eff;
-  --theme-accent: #ff00ff; /* Default to fuchsia to match gradient usage, but will be overridden by theme */
+  --theme-primary: #E50914;
+  --theme-secondary: #B1060F;
+  --theme-accent: #3A8DFF;
+  --stranger-bg: #0B0B0D;
+  --stranger-surface: #131316;
+  --stranger-border: #2A2A2A;
+  --stranger-text: #E4E4E4;
+  --stranger-text-secondary: #A0A0A0;
 }
 
 * {
@@ -20,7 +29,6 @@ html {
   max-width: 100vw !important;
   width: 100% !important;
   height: 100% !important;
-  /* Fix for mobile viewport height */
   height: -webkit-fill-available;
 }
 
@@ -30,29 +38,73 @@ body {
   max-width: 100vw !important;
   width: 100% !important;
   min-height: 100% !important;
-  /* Fix for mobile viewport height */
   min-height: -webkit-fill-available;
   position: relative;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Inter', 'Poppins', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  background: var(--stranger-bg);
+  color: var(--stranger-text);
+  letter-spacing: 0.02em;
 }
 
-/* Dark mode */
-.dark body {
-  background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 25%, #16213e 50%, #1a0a2e 75%, #0a0a1a 100%);
-  background-attachment: fixed;
-  color: #ffffff;
+/* Stranger Things Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Cinzel', 'Benguiat', serif;
+  letter-spacing: 0.05em;
+  font-weight: 600;
 }
 
-/* Light mode */
+/* Dark foggy background - animations disabled */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, #0B0B0D 0%, #131316 50%, #0B0B0D 100%);
+  opacity: 0.3;
+  z-index: -2;
+  pointer-events: none;
+  animation: none !important;
+}
+
+/* Upside-down mist effect - animations disabled */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 50% 50%, rgba(58, 141, 255, 0.05) 0%, transparent 70%);
+  z-index: -1;
+  pointer-events: none;
+  animation: none !important;
+  transform: translateY(0) scale(1) !important;
+}
+
+/* Flicker animation */
+@keyframes subtleFlicker {
+  0%, 100% { opacity: 0.3; }
+  25% { opacity: 0.32; }
+  50% { opacity: 0.28; }
+  75% { opacity: 0.31; }
+}
+
+/* Mist float animation */
+@keyframes mistFloat {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 0.05; }
+  50% { transform: translateY(-20px) scale(1.1); opacity: 0.08; }
+}
+
+/* Dark mode - Stranger Things theme */
+.dark body,
 .light body {
-  background: linear-gradient(135deg, #DFF7E8 0%, #E8E6F5 25%, #F3EDE4 50%, #E8E6F5 75%, #DFF7E8 100%);
+  background: var(--stranger-bg);
   background-attachment: fixed;
-  color: #1e293b;
+  color: var(--stranger-text);
 }
 
 #root {
@@ -61,228 +113,294 @@ body {
   width: 100%;
   overflow-x: hidden;
   overflow-y: auto;
+  position: relative;
+  z-index: 1;
 }
 
-/* Custom scrollbar - Dark mode */
-.dark ::-webkit-scrollbar {
+/* Custom scrollbar - Stranger Things red */
+::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 
-.dark ::-webkit-scrollbar-track {
-  background: #111111;
+::-webkit-scrollbar-track {
+  background: var(--stranger-bg);
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #5e3aff, #8b2eff);
+::-webkit-scrollbar-thumb {
+  background: var(--theme-primary);
   border-radius: 5px;
+  box-shadow: 0 0 5px rgba(229, 9, 20, 0.5);
 }
 
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #8b2eff, #ff006e);
+::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-secondary);
+  box-shadow: 0 0 10px rgba(229, 9, 20, 0.8);
 }
 
-/* Custom scrollbar - Light mode */
-.light ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.light ::-webkit-scrollbar-track {
-  background: #f1f3f5;
-}
-
-.light ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #0066ff, #8b2eff);
-  border-radius: 5px;
-}
-
-.light ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #8b2eff, #ff006e);
-}
-
-/* Smooth transitions */
+/* Smooth transitions - DISABLED */
 * {
-  transition-property: background-color, border-color, color, fill, stroke;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
+  transition: none !important;
+  animation: none !important;
 }
 
-/* Ensure input text is visible in both modes */
+/* Input styling - Stranger Things red borders */
 input[type="number"],
 input[type="date"],
 input[type="text"],
 input[type="email"],
 input[type="password"] {
-  color: inherit !important;
-  -webkit-text-fill-color: inherit !important;
+  color: var(--stranger-text) !important;
+  -webkit-text-fill-color: var(--stranger-text) !important;
+  background-color: var(--stranger-surface) !important;
+  border: 1px solid var(--stranger-border) !important;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  transition: all 0.3s ease;
 }
 
-.dark input[type="number"],
-.dark input[type="date"],
-.dark input[type="text"],
-.dark input[type="email"],
-.dark input[type="password"] {
-  color: #E0E0E0 !important;
-  -webkit-text-fill-color: #E0E0E0 !important;
+input[type="number"]:focus,
+input[type="date"]:focus,
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus {
+  outline: none;
+  border-color: var(--theme-primary) !important;
+  box-shadow: 0 0 10px rgba(229, 9, 20, 0.5), 0 0 20px rgba(229, 9, 20, 0.3);
 }
 
-.light input[type="number"],
-.light input[type="date"],
-.light input[type="text"],
-.light input[type="email"],
-.light input[type="password"] {
-  color: #212121 !important;
-  -webkit-text-fill-color: #212121 !important;
+/* Email input autofill fix */
+input#email:-webkit-autofill,
+input#email:-webkit-autofill:hover,
+input#email:-webkit-autofill:focus,
+input#email:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px var(--stranger-surface) inset !important;
+  -webkit-text-fill-color: var(--stranger-text) !important;
+  background-color: var(--stranger-surface) !important;
+  border-color: var(--stranger-border) !important;
+  color: var(--stranger-text) !important;
 }
 
-/* Email input background for dark mode in login - maximum specificity */
-html.dark input#email,
-html.dark input[type="email"]#email,
-html.dark #email[type="email"],
-.dark input#email[type="email"],
-.dark input#email,
-.dark input[type="email"]#email,
-.dark #email[type="email"],
-input#email.email-dark-bg,
-input.email-dark-bg#email,
-input#email[data-theme="dark"],
-input[data-theme="dark"]#email {
-  background-color: #252550 !important;
-  background: #252550 !important;
-  border-color: #3a3a6a !important;
-}
-
-/* Fix autofill/autocomplete background in dark mode - this is the key fix */
-html.dark input#email:-webkit-autofill,
-html.dark input#email:-webkit-autofill:hover,
-html.dark input#email:-webkit-autofill:focus,
-html.dark input#email:-webkit-autofill:active,
-.dark input#email:-webkit-autofill,
-.dark input#email:-webkit-autofill:hover,
-.dark input#email:-webkit-autofill:focus,
-.dark input#email:-webkit-autofill:active,
-input#email.email-dark-bg:-webkit-autofill,
-input#email.email-dark-bg:-webkit-autofill:hover,
-input#email.email-dark-bg:-webkit-autofill:focus,
-input#email.email-dark-bg:-webkit-autofill:active,
-input#email[data-theme="dark"]:-webkit-autofill,
-input#email[data-theme="dark"]:-webkit-autofill:hover,
-input#email[data-theme="dark"]:-webkit-autofill:focus,
-input#email[data-theme="dark"]:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 1000px #252550 inset !important;
-  -webkit-text-fill-color: #ffffff !important;
-  background-color: #252550 !important;
-  background: #252550 !important;
-  border-color: #3a3a6a !important;
-  color: #ffffff !important;
-}
-
-/* Ensure light mode email input has proper background */
-html.light input#email,
-html.light input[type="email"]#email,
-.light input#email,
-.light input[type="email"]#email,
-input#email.email-light-bg,
-input.email-light-bg#email {
-  background-color: #f8faff !important;
-  background: #f8faff !important;
-}
-
-/* Fix autofill/autocomplete background in light mode */
-html.light input#email:-webkit-autofill,
-html.light input#email:-webkit-autofill:hover,
-html.light input#email:-webkit-autofill:focus,
-html.light input#email:-webkit-autofill:active,
-.light input#email:-webkit-autofill,
-.light input#email:-webkit-autofill:hover,
-.light input#email:-webkit-autofill:focus,
-.light input#email:-webkit-autofill:active,
-input#email.email-light-bg:-webkit-autofill,
-input#email.email-light-bg:-webkit-autofill:hover,
-input#email.email-light-bg:-webkit-autofill:focus,
-input#email.email-light-bg:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 1000px #f8faff inset !important;
-  -webkit-text-fill-color: #1e293b !important;
-  background-color: #f8faff !important;
-  background: #f8faff !important;
-  color: #1e293b !important;
-}
-
-/* Placeholder styling for dark mode - make it more visible */
-.dark input[type="email"]::placeholder,
-.dark input[type="text"]::placeholder,
-.dark input[type="password"]::placeholder {
-  color: #d0d0e8 !important;
+/* Placeholder styling */
+input[type="email"]::placeholder,
+input[type="text"]::placeholder,
+input[type="password"]::placeholder {
+  color: var(--stranger-text-secondary) !important;
   opacity: 1 !important;
-  -webkit-text-fill-color: #d0d0e8 !important;
+  -webkit-text-fill-color: var(--stranger-text-secondary) !important;
 }
 
-/* Specific placeholder for email input in dark mode */
-.dark input#email::placeholder,
-.dark #email[type="email"]::placeholder {
-  color: #d0d0e8 !important;
-  opacity: 1 !important;
-  -webkit-text-fill-color: #d0d0e8 !important;
+/* Recharts tooltip styling */
+.recharts-tooltip-wrapper {
+  background-color: var(--stranger-surface) !important;
+  border: 1px solid var(--theme-primary) !important;
+  color: var(--stranger-text) !important;
+  box-shadow: 0 0 15px rgba(229, 9, 20, 0.4);
 }
 
-/* Placeholder styling for light mode */
-.light input[type="email"]::placeholder,
-.light input[type="text"]::placeholder,
-.light input[type="password"]::placeholder {
-  color: #94a3b8 !important;
-  opacity: 1 !important;
-  -webkit-text-fill-color: #94a3b8 !important;
+.recharts-legend-wrapper {
+  color: var(--stranger-text) !important;
 }
 
-/* Recharts tooltip styling for dark/light mode */
-.dark .recharts-tooltip-wrapper {
-  background-color: #1a1a1a !important;
-  border: 1px solid #2a2a2a !important;
-  color: #ffffff !important;
-}
-
-.light .recharts-tooltip-wrapper {
-  background-color: #ffffff !important;
-  border: 1px solid #dee2e6 !important;
-  color: #212121 !important;
-}
-
-.dark .recharts-legend-wrapper {
-  color: #ffffff !important;
-}
-
-.light .recharts-legend-wrapper {
-  color: #212121 !important;
-}
-
-/* Recharts label styling for better visibility */
-.dark .recharts-pie-label-text {
-  fill: #ffffff !important;
+.recharts-pie-label-text {
+  fill: var(--stranger-text) !important;
   font-weight: 600 !important;
   font-size: 12px !important;
 }
 
-.light .recharts-pie-label-text {
-  fill: #212121 !important;
-  font-weight: 600 !important;
-  font-size: 12px !important;
-}
-
-.dark .recharts-pie-label-line {
-  stroke: #ffffff !important;
+.recharts-pie-label-line {
+  stroke: var(--stranger-text) !important;
   stroke-width: 1 !important;
 }
 
-.light .recharts-pie-label-line {
-  stroke: #212121 !important;
-  stroke-width: 1 !important;
+/* ============================================
+   STRANGER THINGS UTILITY CLASSES
+   ============================================ */
+
+/* Red neon glow effect */
+.neon-red {
+  box-shadow: 0 0 10px var(--theme-primary), 0 0 20px var(--theme-primary), 0 0 30px var(--theme-primary);
+}
+
+.neon-red-strong {
+  box-shadow: 0 0 20px var(--theme-primary), 0 0 40px var(--theme-primary), 0 0 60px var(--theme-primary);
+}
+
+/* Blue neon glow (upside-down) */
+.neon-blue {
+  box-shadow: 0 0 10px var(--theme-accent), 0 0 20px var(--theme-accent), 0 0 30px var(--theme-accent);
+}
+
+.neon-blue-strong {
+  box-shadow: 0 0 20px var(--theme-accent), 0 0 40px var(--theme-accent), 0 0 60px var(--theme-accent);
+}
+
+/* Glow on hover */
+.glow-hover-red:hover {
+  box-shadow: 0 0 20px var(--theme-primary), 0 0 40px var(--theme-primary);
+  transform: scale(1.05);
+}
+
+.glow-hover-blue:hover {
+  box-shadow: 0 0 20px var(--theme-accent), 0 0 40px var(--theme-accent);
+  transform: scale(1.05);
+}
+
+/* Stranger Things button style - All buttons red */
+.btn-stranger {
+  background: #E50914 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 4px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  box-shadow: 0 0 10px #E50914 !important;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.btn-stranger:hover {
+  background: #B1060F !important;
+  box-shadow: 0 0 20px #E50914, 0 0 40px #E50914 !important;
+  transform: scale(1.05);
+}
+
+.btn-stranger:active {
+  transform: scale(0.98);
+}
+
+/* Make all buttons red */
+button:not([disabled]) {
+  background-color: #E50914 !important;
+  color: #fff !important;
+  border-color: #E50914 !important;
+}
+
+button:not([disabled]):hover {
+  background-color: #B1060F !important;
+  border-color: #B1060F !important;
+}
+
+/* Make AnimatedButton variants red */
+.bg-stranger-red,
+.bg-stranger-surface,
+.bg-stranger-blood {
+  background-color: #E50914 !important;
+}
+
+/* Stranger Things card style */
+.card-stranger {
+  background: var(--stranger-surface);
+  border: 1px solid var(--stranger-border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.card-stranger:hover {
+  border-color: var(--theme-primary);
+  box-shadow: 0 0 15px rgba(229, 9, 20, 0.3);
+}
+
+/* Red underline animation */
+.underline-stranger {
+  position: relative;
+  display: inline-block;
+}
+
+.underline-stranger::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--theme-primary);
+  box-shadow: 0 0 10px var(--theme-primary);
+  transition: width 0.3s ease;
+}
+
+.underline-stranger:hover::after {
+  width: 100%;
+}
+
+/* Title with red glow */
+.title-stranger {
+  color: var(--theme-primary);
+  text-shadow: 0 0 10px var(--theme-primary), 0 0 20px var(--theme-primary), 0 0 30px var(--theme-primary);
+  font-family: 'Cinzel', 'Benguiat', serif;
+  letter-spacing: 0.1em;
+}
+
+/* Fog overlay effect */
+.fog-overlay {
+  position: relative;
+}
+
+.fog-overlay::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 50% 50%, rgba(58, 141, 255, 0.1) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 1;
+  animation: mistFloat 15s ease-in-out infinite;
+}
+
+/* VHS noise effect (subtle) */
+.vhs-noise {
+  position: relative;
+}
+
+.vhs-noise::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.03) 2px, rgba(0, 0, 0, 0.03) 4px),
+    repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0, 0, 0, 0.03) 2px, rgba(0, 0, 0, 0.03) 4px);
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.5;
+  animation: vhsFlicker 0.1s infinite;
+}
+
+@keyframes vhsFlicker {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.3; }
+}
+
+/* Link hover - neon blue */
+a {
+  color: var(--stranger-text);
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+a:hover {
+  color: var(--theme-accent);
+  text-shadow: 0 0 10px var(--theme-accent);
+}
+
+/* Upside Down mode styles */
+.upside-down {
+  filter: hue-rotate(180deg) invert(1);
+}
+
+.upside-down body::after {
+  background: radial-gradient(circle at 50% 50%, rgba(229, 9, 20, 0.1) 0%, transparent 70%);
 }
 
 /* Mobile scrolling fixes */
 @media (max-width: 768px) {
   html {
-    /* Use viewport units that account for mobile browser UI */
     height: 100vh;
     height: -webkit-fill-available;
   }
@@ -297,10 +415,8 @@ input#email.email-light-bg:-webkit-autofill:active {
     min-height: -webkit-fill-available;
   }
   
-  /* Ensure main content can scroll on mobile */
   main {
     -webkit-overflow-scrolling: touch;
     overflow-y: auto !important;
   }
 }
-

@@ -5,6 +5,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import Layout from './components/Layout'
 import { PageTransition } from './components/layout/PageTransition'
+import NotificationManager from './components/NotificationManager'
+import { StrangerThemeManager } from './components/StrangerThemeManager'
 
 // Lazy load pages for better performance
 const Login = lazy(() => import('./pages/Login'))
@@ -168,6 +170,8 @@ function App() {
         }}
       >
         <AuthProvider>
+          <StrangerThemeManager />
+          <NotificationManager />
           <AppRoutes />
         </AuthProvider>
       </Router>

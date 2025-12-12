@@ -8,48 +8,53 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Dark mode colors - Rich, deep colors
-        'dark-bg': '#0f0f23',
-        'dark-surface': '#1a1a3a',
-        'dark-card': '#252550',
-        'dark-border': '#3a3a6a',
-        'dark-text': '#ffffff',
-        'dark-text-secondary': '#b8b8d8',
-        'dark-text-tertiary': '#8888a8',
-        'dark-primary': '#5e3aff', // Deep indigo
-        'dark-accent': '#8b2eff', // Electric violet
+        // Stranger Things Dark Horror + Neon Red Theme
+        'dark-bg': '#0B0B0D',           // Background
+        'dark-surface': '#131316',     // Panels / Cards
+        'dark-card': '#131316',        // Cards
+        'dark-border': '#2A2A2A',      // Borders / Outline
+        'dark-text': '#E4E4E4',        // Text Primary
+        'dark-text-secondary': '#A0A0A0', // Text Secondary
+        'dark-text-tertiary': '#707070',
+        'dark-primary': '#E50914',     // Primary Red (Stranger Things)
+        'dark-accent': '#B1060F',      // Deep Blood Red
         
-        // Light mode colors - Soft, fresh palette
-        'light-bg': '#DFF7E8',        // Light Mint Green - background
-        'light-surface': '#F3EDE4',   // Soft Beige - surface/card
-        'light-card': '#F3EDE4',      // Soft Beige - card background
-        'light-border': '#E8E6F5',    // Pale Lavender Grey - borders
-        'light-text': '#1e293b',
-        'light-text-secondary': '#475569',
-        'light-text-tertiary': '#94a3b8',
-        'light-primary': '#0066ff', // Electric blue
-        'light-accent': '#8b2eff', // Electric violet
+        // Light mode - Keep dark theme for Stranger Things vibe
+        'light-bg': '#0B0B0D',         // Same as dark
+        'light-surface': '#131316',    // Same as dark
+        'light-card': '#131316',       // Same as dark
+        'light-border': '#2A2A2A',    // Same as dark
+        'light-text': '#E4E4E4',       // Same as dark
+        'light-text-secondary': '#A0A0A0', // Same as dark
+        'light-text-tertiary': '#707070',
+        'light-primary': '#E50914',    // Primary Red
+        'light-accent': '#B1060F',     // Deep Blood Red
         
-        // Accent colors - Bold, trending, attractive palette
-        // Dynamic accent colors that use CSS variables for theme customization
-        'accent-indigo': 'var(--theme-primary, #5e3aff)',      // Deep indigo - uses custom theme primary
-        'accent-violet': 'var(--theme-secondary, #8b2eff)',   // Electric violet - uses custom theme secondary
-        'accent-fuchsia': 'var(--theme-accent, #ff00ff)',     // Magenta fuchsia - uses custom theme accent
-        // Static accent colors (not affected by theme customization)
-        'accent-blue': '#0066ff',        // Electric blue
-        'accent-purple': '#9333ea',      // Vibrant purple
-        'accent-pink': '#ff006e',        // Hot pink
-        'accent-cyan': '#00d4ff',       // Bright cyan
-        'accent-green': '#00ff88',       // Neon green
-        'accent-amber': '#ffb800',       // Bold amber
-        'accent-orange': '#ff6b35',      // Vibrant orange
-        'accent-red': '#ff1744',         // Bold red
-        'accent-rose': '#ff006e',        // Bold rose
-        'accent-teal': '#00ffcc',        // Bright teal
-        'accent-emerald': '#00ff88',     // Neon emerald
-        'accent-lime': '#aaff00',        // Electric lime
-        'accent-yellow': '#ffd700',      // Gold yellow
-        'accent-sky': '#00b8ff',         // Bright sky
+        // Stranger Things Accent Colors
+        'accent-indigo': 'var(--theme-primary, #E50914)',      // Primary Red
+        'accent-violet': 'var(--theme-secondary, #B1060F)',   // Deep Blood Red
+        'accent-fuchsia': 'var(--theme-accent, #3A8DFF)',     // Accent Neon Blue
+        // Stranger Things Static Accent Colors
+        'accent-blue': '#3A8DFF',        // Accent Neon Blue (upside-down glow)
+        'accent-purple': '#B1060F',      // Deep Blood Red
+        'accent-pink': '#E50914',        // Primary Red
+        'accent-cyan': '#3A8DFF',       // Neon Blue
+        'accent-green': '#E50914',       // Use red for success
+        'accent-amber': '#E50914',       // Use red for warning
+        'accent-orange': '#E50914',      // Use red
+        'accent-red': '#E50914',         // Primary Red
+        'accent-rose': '#B1060F',        // Deep Blood Red
+        'accent-teal': '#3A8DFF',        // Neon Blue
+        'accent-emerald': '#E50914',     // Use red
+        'accent-lime': '#E50914',        // Use red
+        'accent-yellow': '#E50914',      // Use red
+        'accent-sky': '#3A8DFF',         // Neon Blue
+        'stranger-red': '#E50914',       // Primary Red (Stranger Things)
+        'stranger-blood': '#B1060F',     // Deep Blood Red
+        'stranger-blue': '#3A8DFF',      // Accent Neon Blue
+        'success': '#E50914',            // Use red
+        'warning': '#E50914',            // Use red
+        'error': '#E50914',              // Use red
       },
       boxShadow: {
         'soft': '0 2px 8px rgba(0, 0, 0, 0.1)',
