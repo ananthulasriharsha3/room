@@ -171,7 +171,7 @@ export default function Login() {
                 required
                 autoComplete="current-password"
                 className="w-full px-4 py-3 bg-transparent/10 backdrop-blur-sm border border-white/15 rounded-xl text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/30 transition-all"
-                style={{ background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' }}
+                style={{ background: '#000000', borderColor: 'rgba(255, 255, 255, 0.15)' }}
                 placeholder="••••••••"
               />
             </div>
