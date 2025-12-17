@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -7,10 +7,14 @@ import Layout from './components/Layout'
 import { PageTransition } from './components/layout/PageTransition'
 import NotificationManager from './components/NotificationManager'
 import { StrangerThemeManager } from './components/StrangerThemeManager'
+import { useInAppNotifications, InAppNotification } from './components/InAppNotification'
+import { setInAppNotificationCallback } from './utils/notifications'
 
 // Lazy load pages for better performance
 const Login = lazy(() => import('./pages/Login'))
 const Register = lazy(() => import('./pages/Register'))
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Schedule = lazy(() => import('./pages/Schedule'))
 const Expenses = lazy(() => import('./pages/Expenses'))
@@ -61,6 +65,22 @@ function AppRoutes() {
             element={
               <Suspense fallback={<PageLoader />}>
                 {!user ? <Register /> : <Navigate to="/dashboard" />}
+              </Suspense>
+            } 
+          />
+          <Route 
+            path="/forgot-password" 
+            element={
+              <Suspense fallback={<PageLoader />}>
+                {!user ? <ForgotPassword /> : <Navigate to="/dashboard" />}
+              </Suspense>
+            } 
+          />
+          <Route 
+            path="/reset-password" 
+            element={
+              <Suspense fallback={<PageLoader />}>
+                {!user ? <ResetPassword /> : <Navigate to="/dashboard" />}
               </Suspense>
             } 
           />
@@ -161,6 +181,13 @@ function AppRoutes() {
 }
 
 function App() {
+  const { notifications, showNotification, removeNotification } = useInAppNotifications()
+
+  useEffect(() => {
+    // Set the callback so notifications.js can use it
+    setInAppNotificationCallback(showNotification)
+  }, [showNotification])
+
   return (
     <ThemeProvider>
       <Router
@@ -173,6 +200,29 @@ function App() {
           <StrangerThemeManager />
           <NotificationManager />
           <AppRoutes />
+          
+          {/* In-app notifications (fallback when browser notifications are blocked) */}
+          <AnimatePresence>
+            {notifications.map((notif, index) => (
+              <div
+                key={notif.id}
+                style={{
+                  position: 'fixed',
+                  top: `${20 + index * 120}px`,
+                  right: '20px',
+                  zIndex: 9999,
+                  pointerEvents: 'auto',
+                }}
+              >
+                <InAppNotification
+                  title={notif.title}
+                  body={notif.body}
+                  duration={notif.duration}
+                  onClose={() => removeNotification(notif.id)}
+                />
+              </div>
+            ))}
+          </AnimatePresence>
         </AuthProvider>
       </Router>
     </ThemeProvider>

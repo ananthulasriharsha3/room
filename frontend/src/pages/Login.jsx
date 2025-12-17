@@ -152,9 +152,17 @@ export default function Login() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-white/90 mb-2">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label htmlFor="password" className="block text-sm font-medium text-white/90">
+                  Password
+                </label>
+                <Link 
+                  to="/forgot-password" 
+                  className="text-sm text-white/70 hover:text-white hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <input
                 id="password"
                 type="password"
@@ -165,11 +173,6 @@ export default function Login() {
                 className="w-full px-4 py-3 bg-transparent/10 backdrop-blur-sm border border-white/15 rounded-xl text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/30 transition-all"
                 style={{ background: 'rgba(0, 0, 0, 0.1)', borderColor: 'rgba(255, 255, 255, 0.15)' }}
                 placeholder="••••••••"
-                style={{
-                  ...(theme === 'dark' && { backgroundColor: '#2a2a2a' }),
-                  color: 'inherit',
-                  WebkitTextFillColor: 'inherit'
-                }}
               />
             </div>
 

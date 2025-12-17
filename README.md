@@ -5,7 +5,6 @@ This project tracks shared kitchen duties for a room and rotates assignments dai
 ## Project structure
 
 - `frontend/` – Vite + React app for managing the schedule and expenses
-- `backend/` – FastAPI service that exposes endpoints for duty rotation and expense tracking
 
 ## Getting started
 
@@ -153,30 +152,31 @@ create table if not exists public.grocery_purchases (
 
 create index if not exists idx_grocery_purchases_purchase_date on public.grocery_purchases(purchase_date);
 create index if not exists idx_grocery_purchases_created_by on public.grocery_purchases(created_by);
+
+create table if not exists public.password_reset_tokens (
+  id bigint primary key generated always as identity,
+  user_id uuid not null references public.users(id) on delete cascade,
+  token_hash text not null,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  used_at timestamptz
+);
+
+create index if not exists idx_password_reset_tokens_user_id on public.password_reset_tokens(user_id);
+create index if not exists idx_password_reset_tokens_token_hash on public.password_reset_tokens(token_hash);
+create index if not exists idx_password_reset_tokens_expires_at on public.password_reset_tokens(expires_at);
+
+-- Add updated_at column to users table if it doesn't exist
+alter table public.users add column if not exists updated_at timestamptz;
 ```
 
-**Note:** If you encounter errors about missing columns (e.g., "column users.is_admin does not exist"), run the migration script `backend/migrations/add_user_columns.sql` in your Supabase SQL editor.
+**Note:** If you encounter errors about missing columns (e.g., "column users.is_admin does not exist"), you can add them using the SQL commands in the database schema section above.
 
-**Note:** If you encounter errors about missing the `stock_items` table, run the migration script `backend/migrations/create_stock_items_table.sql` in your Supabase SQL editor.
+**Note:** If you encounter errors about missing the `password_reset_tokens` table, run the migration script `frontend/migrations/create_password_reset_tokens_table.sql` in your Supabase SQL editor.
 
-**Note:** If you encounter errors about missing the `grocery_purchases` table, run the migration script `backend/migrations/create_grocery_purchases_table.sql` in your Supabase SQL editor.
+**Note:** The `password_reset_tokens` table is required for the forgot password feature. If you encounter errors about this table, run the migration script `frontend/migrations/create_password_reset_tokens_table.sql` in your Supabase SQL editor.
 
-**Important:** For the Grocery Bill Scanner feature, you need to install Tesseract OCR on your system:
-
-- **Windows:**
-  1. Download the installer from https://github.com/UB-Mannheim/tesseract/wiki
-  2. Run the installer (e.g., `tesseract-ocr-w64-setup-5.x.x.exe`)
-  3. During installation, check "Add to PATH" or note the installation path (usually `C:\Program Files\Tesseract-OCR`)
-  4. If not added to PATH, set environment variable: `TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe`
-  5. Restart your backend server after installation
-
-- **macOS:** `brew install tesseract`
-
-- **Linux:** `sudo apt-get install tesseract-ocr` (Ubuntu/Debian) or `sudo yum install tesseract` (CentOS/RHEL)
-
-**Note:** The backend will automatically detect Tesseract in common Windows installation paths. If installed elsewhere, set the `TESSERACT_CMD` environment variable.
-
-The API persists expenses and household schedule settings to these tables.
+All data is stored directly in Supabase - no backend server required!
 
 ### Frontend (React + Vite)
 

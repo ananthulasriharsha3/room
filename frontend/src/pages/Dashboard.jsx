@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { listExpenses, closeMonth } from '../utils/expenses'
 import { listShoppingItems } from '../utils/shopping'
 import { listGroceryPurchases } from '../utils/grocery'
-import { areNotificationsEnabled, requestNotificationPermission } from '../utils/notifications'
+import { areNotificationsEnabled, requestNotificationPermission, sendNotification, getDutiesForDate, formatAssignments } from '../utils/notifications'
 import { format, startOfMonth, parseISO } from 'date-fns'
 import { FaDollarSign, FaShoppingCart } from 'react-icons/fa'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
@@ -42,6 +42,81 @@ export default function Dashboard() {
       alert('Notifications enabled! You will receive reminders for your duties.')
     } else {
       alert('Please enable notifications in your browser settings to receive duty reminders.')
+    }
+  }
+
+  const handleTestNotification = async () => {
+    // Check permission first
+    if (!('Notification' in window)) {
+      alert('Your browser does not support notifications.')
+      return
+    }
+
+    const permission = Notification.permission
+    console.log('🔍 Current notification permission:', permission)
+
+    if (permission === 'denied') {
+      alert('Notifications are blocked. Please enable them in your browser settings:\n\nChrome: Settings → Privacy → Site Settings → Notifications\n\nThen refresh the page.')
+      return
+    }
+
+    if (permission !== 'granted') {
+      const result = await requestNotificationPermission()
+      if (!result) {
+        alert('Please allow notifications to test them.')
+        return
+      }
+      setNotificationEnabled(true)
+    }
+
+    try {
+      console.log('🧪 Testing notification...')
+      
+      // Try to get today's duties for a real test
+      const today = new Date()
+      const duties = await getDutiesForDate(today)
+      
+      if (duties && duties.assignments && Object.keys(duties.assignments).length > 0) {
+        // Send real schedule notification
+        const dateStr = format(today, 'EEE d MMM')
+        const dayName = duties.dayName
+        const assignmentsText = formatAssignments(duties.assignments)
+        const noteText = duties.note ? `\n\nNote: ${duties.note}` : ''
+        
+        const notification = sendNotification(
+          `⚡ Today's Schedule (${dayName})`,
+          {
+            body: `${dateStr}\n\n${assignmentsText}${noteText}`,
+            tag: `test-notification-${Date.now()}`,
+            requireInteraction: true,
+          }
+        )
+
+        if (!notification) {
+          alert('Failed to create notification. Check console for details.')
+        } else {
+          console.log('✅ Test notification sent! Check your browser notification area (top-right corner or system tray).')
+        }
+      } else {
+        // Send a test notification if no schedule
+        const notification = sendNotification(
+          '🔔 Test Notification',
+          {
+            body: 'Push notifications are working! You will receive reminders for your duties.',
+            tag: `test-notification-${Date.now()}`,
+            requireInteraction: true,
+          }
+        )
+
+        if (!notification) {
+          alert('Failed to create notification. Check console for details.')
+        } else {
+          console.log('✅ Test notification sent! Check your browser notification area (top-right corner or system tray).')
+        }
+      }
+    } catch (error) {
+      console.error('Error testing notification:', error)
+      alert('Error sending test notification. Check console for details.')
     }
   }
 
@@ -275,15 +350,26 @@ export default function Dashboard() {
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold dark:text-dark-text light:text-light-text mb-2">Dashboard</h1>
             <p className="text-sm sm:text-base dark:text-dark-text-secondary light:text-light-text-secondary">Overview of your room duties and expenses</p>
           </div>
-          {!notificationEnabled && (
-            <button
-              onClick={handleEnableNotifications}
-              className="btn-stranger px-4 py-2 text-sm whitespace-nowrap"
-              title="Enable notifications for duty reminders"
-            >
-              🔔 Enable Notifications
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {!notificationEnabled && (
+              <button
+                onClick={handleEnableNotifications}
+                className="btn-stranger px-4 py-2 text-sm whitespace-nowrap"
+                title="Enable notifications for duty reminders"
+              >
+                🔔 Enable Notifications
+              </button>
+            )}
+            {notificationEnabled && (
+              <button
+                onClick={handleTestNotification}
+                className="px-4 py-2 text-sm whitespace-nowrap bg-gradient-to-r from-accent-blue to-accent-indigo text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-accent-blue/30 hover:scale-105 transition-all"
+                title="Test push notifications"
+              >
+                🧪 Test Notification
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

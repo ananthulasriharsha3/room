@@ -1,6 +1,13 @@
 import { getSchedule } from './schedule'
 import { format, addDays } from 'date-fns'
 
+// Global callback for in-app notifications (fallback when browser notifications are blocked)
+let inAppNotificationCallback = null
+
+export function setInAppNotificationCallback(callback) {
+  inAppNotificationCallback = callback
+}
+
 // Request notification permission
 export async function requestNotificationPermission() {
   if (!('Notification' in window)) {
@@ -27,22 +34,95 @@ export function areNotificationsEnabled() {
 
 // Send a browser notification
 export function sendNotification(title, options = {}) {
-  if (!areNotificationsEnabled()) {
+  // Check permission status
+  if (!('Notification' in window)) {
+    console.error('❌ This browser does not support notifications')
     return null
   }
 
-  const notification = new Notification(title, {
-    icon: '/favicon.svg',
-    badge: '/favicon.svg',
-    ...options,
-  })
+  const permission = Notification.permission
+  console.log('📋 Notification permission status:', permission)
 
-  // Auto-close after 5 seconds
-  setTimeout(() => {
-    notification.close()
-  }, 5000)
+  if (permission !== 'granted') {
+    console.error('❌ Notification permission not granted. Current status:', permission)
+    console.log('💡 Please enable notifications in your browser settings')
+    return null
+  }
 
-  return notification
+  try {
+    console.log('🔔 Creating notification:', { title, options })
+    
+    const notification = new Notification(title, {
+      icon: '/favicon.svg',
+      badge: '/favicon.svg',
+      ...options,
+    })
+
+    console.log('✅ Notification created successfully:', notification)
+    console.log('📍 Check your browser notification area (top-right corner or system tray)')
+
+    // Also show in-app notification as fallback (in case Windows blocks browser notifications)
+    if (inAppNotificationCallback) {
+      try {
+        inAppNotificationCallback(title, options.body || '')
+        console.log('✅ In-app notification also shown as fallback')
+      } catch (error) {
+        console.warn('Failed to show in-app notification:', error)
+      }
+    }
+
+    // Add event listeners to track notification behavior
+    notification.onclick = () => {
+      console.log('👆 Notification clicked')
+      window.focus()
+      notification.close()
+    }
+
+    notification.onshow = () => {
+      console.log('👁️ Notification is now visible')
+    }
+
+    notification.onerror = (error) => {
+      console.error('❌ Notification error:', error)
+    }
+
+    notification.onclose = () => {
+      console.log('🔒 Notification closed')
+    }
+
+    // Auto-close after 5 seconds (unless requireInteraction is true)
+    if (!options.requireInteraction) {
+      setTimeout(() => {
+        notification.close()
+      }, 5000)
+    } else {
+      // Keep open longer for important notifications (10 seconds)
+      setTimeout(() => {
+        notification.close()
+      }, 10000)
+    }
+
+    return notification
+  } catch (error) {
+    console.error('❌ Error creating notification:', error)
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    })
+    
+    // Show in-app notification even if browser notification fails
+    if (inAppNotificationCallback) {
+      try {
+        inAppNotificationCallback(title, options.body || '')
+        console.log('✅ Showing in-app notification as fallback')
+      } catch (fallbackError) {
+        console.warn('Failed to show in-app notification fallback:', fallbackError)
+      }
+    }
+    
+    return null
+  }
 }
 
 // Get duties for a specific date
@@ -52,6 +132,7 @@ export async function getDutiesForDate(date) {
     const schedule = await getSchedule(year)
     
     if (!schedule || !schedule.days) {
+      console.log('No schedule found for year:', year)
       return null
     }
     
@@ -59,6 +140,7 @@ export async function getDutiesForDate(date) {
     const dayData = schedule.days.find(day => day.date === dateStr)
     
     if (!dayData) {
+      console.log('No duties found for date:', dateStr)
       return null
     }
 
@@ -71,6 +153,7 @@ export async function getDutiesForDate(date) {
   } catch (error) {
     // Schedule might not exist yet - that's okay
     if (error.message && error.message.includes('not found')) {
+      console.log('Schedule not found for date:', format(date, 'yyyy-MM-dd'))
       return null
     }
     console.error('Error fetching duties for date:', error)
@@ -94,9 +177,21 @@ export function getUserDutiesForDate(duties, userDisplayName) {
   return userDuties
 }
 
+// Format assignments for notification
+export function formatAssignments(assignments) {
+  if (!assignments || Object.keys(assignments).length === 0) {
+    return ''
+  }
+  
+  return Object.entries(assignments)
+    .map(([task, person]) => `${task}: ${person}`)
+    .join('\n')
+}
+
 // Check and send reminders for tomorrow
 export async function checkTomorrowReminders(userDisplayName) {
   if (!areNotificationsEnabled()) {
+    console.log('Notifications not enabled, skipping tomorrow reminder')
     return
   }
 
@@ -105,23 +200,21 @@ export async function checkTomorrowReminders(userDisplayName) {
     const duties = await getDutiesForDate(tomorrow)
     
     if (!duties || !duties.assignments || Object.keys(duties.assignments).length === 0) {
+      console.log('No duties tomorrow')
       return // No duties tomorrow (might be weekend)
     }
 
-    const userDuties = getUserDutiesForDate(duties, userDisplayName)
-    
-    if (userDuties.length === 0) {
-      return // User has no duties tomorrow
-    }
-
-    const tasksList = userDuties.join(', ')
+    // Format date: "Wed 17 Dec"
+    const dateStr = format(tomorrow, 'EEE d MMM')
     const dayName = duties.dayName
+    const assignmentsText = formatAssignments(duties.assignments)
     const noteText = duties.note ? `\n\nNote: ${duties.note}` : ''
     
+    console.log('Sending tomorrow reminder:', dateStr, assignmentsText)
     sendNotification(
-      `📅 Reminder: Your Duties Tomorrow (${dayName})`,
+      `📅 Tomorrow's Schedule (${dayName})`,
       {
-        body: `You have the following duties tomorrow:\n${tasksList}${noteText}`,
+        body: `${dateStr}\n\n${assignmentsText}${noteText}`,
         tag: `duty-reminder-${format(tomorrow, 'yyyy-MM-dd')}`,
         requireInteraction: false,
       }
@@ -134,6 +227,7 @@ export async function checkTomorrowReminders(userDisplayName) {
 // Check and send reminders for today
 export async function checkTodayReminders(userDisplayName) {
   if (!areNotificationsEnabled()) {
+    console.log('Notifications not enabled, skipping today reminder')
     return
   }
 
@@ -142,29 +236,56 @@ export async function checkTodayReminders(userDisplayName) {
     const duties = await getDutiesForDate(today)
     
     if (!duties || !duties.assignments || Object.keys(duties.assignments).length === 0) {
+      console.log('No duties today')
       return // No duties today (might be weekend)
     }
 
-    const userDuties = getUserDutiesForDate(duties, userDisplayName)
-    
-    if (userDuties.length === 0) {
-      return // User has no duties today
-    }
-
-    const tasksList = userDuties.join(', ')
+    // Format date: "Wed 17 Dec"
+    const dateStr = format(today, 'EEE d MMM')
     const dayName = duties.dayName
+    const assignmentsText = formatAssignments(duties.assignments)
     const noteText = duties.note ? `\n\nNote: ${duties.note}` : ''
     
+    console.log('Sending today reminder:', dateStr, assignmentsText)
     sendNotification(
-      `⚡ Today's Duties (${dayName})`,
+      `⚡ Today's Schedule (${dayName})`,
       {
-        body: `Your duties for today:\n${tasksList}${noteText}`,
+        body: `${dateStr}\n\n${assignmentsText}${noteText}`,
         tag: `duty-today-${format(today, 'yyyy-MM-dd')}`,
         requireInteraction: true, // Keep open longer for today's duties
       }
     )
   } catch (error) {
     console.error('Error checking today reminders:', error)
+  }
+}
+
+// Check if current time is between 8 PM and midnight
+function isEveningTime() {
+  const now = new Date()
+  const hour = now.getHours()
+  // Between 8 PM (20:00) and midnight (23:59) - hours 20, 21, 22, 23
+  return hour >= 20
+}
+
+// Check and send appropriate reminder based on time
+export async function checkScheduledReminders(userDisplayName) {
+  if (!areNotificationsEnabled()) {
+    return
+  }
+
+  try {
+    if (isEveningTime()) {
+      // Between 8 PM and midnight - show tomorrow's schedule
+      console.log('🌙 Evening time (8 PM - midnight): Showing tomorrow\'s schedule')
+      await checkTomorrowReminders(userDisplayName)
+    } else {
+      // During the day - show today's schedule
+      console.log('☀️ Day time: Showing today\'s schedule')
+      await checkTodayReminders(userDisplayName)
+    }
+  } catch (error) {
+    console.error('Error checking scheduled reminders:', error)
   }
 }
 
@@ -179,39 +300,29 @@ export async function checkAllReminders(userDisplayName) {
 
 // Set up periodic reminder checks
 let reminderInterval = null
-let todayCheckInterval = null
 
 export function startReminderChecks(userDisplayName) {
-  // Clear any existing intervals
-  if (reminderInterval) {
-    clearInterval(reminderInterval)
-  }
-  if (todayCheckInterval) {
-    clearInterval(todayCheckInterval)
-  }
+  // Stop any existing intervals
+  stopReminderChecks()
 
-  // Check immediately
+  // Check immediately on app load (both today and tomorrow)
   checkAllReminders(userDisplayName)
 
-  // Check for tomorrow's duties every 6 hours (to catch evening reminders)
+  // Check every 3 hours with smart scheduling
+  // This will show today's schedule during the day, and tomorrow's schedule from 8 PM to midnight
   reminderInterval = setInterval(() => {
-    checkTomorrowReminders(userDisplayName)
-  }, 6 * 60 * 60 * 1000) // 6 hours
-
-  // Check for today's duties every 2 hours (more frequent for today)
-  todayCheckInterval = setInterval(() => {
-    checkTodayReminders(userDisplayName)
-  }, 2 * 60 * 60 * 1000) // 2 hours
+    checkScheduledReminders(userDisplayName)
+  }, 3 * 60 * 60 * 1000) // 3 hours in milliseconds
+  
+  console.log('✅ Reminder checks started: Every 3 hours')
+  console.log('📅 Schedule: Today\'s duties during day, Tomorrow\'s duties from 8 PM to midnight')
 }
 
 export function stopReminderChecks() {
   if (reminderInterval) {
     clearInterval(reminderInterval)
     reminderInterval = null
-  }
-  if (todayCheckInterval) {
-    clearInterval(todayCheckInterval)
-    todayCheckInterval = null
+    console.log('🛑 Reminder checks stopped')
   }
 }
 
