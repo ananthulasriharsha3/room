@@ -32,8 +32,9 @@ export function areNotificationsEnabled() {
   return 'Notification' in window && Notification.permission === 'granted'
 }
 
-// Send a browser notification
-export function sendNotification(title, options = {}) {
+// Send a system notification via Service Worker (for mobile compatibility)
+// This ensures notifications appear in Android notification panel
+export async function sendNotification(title, options = {}) {
   // Check permission status
   if (!('Notification' in window)) {
     console.error('❌ This browser does not support notifications')
@@ -50,7 +51,43 @@ export function sendNotification(title, options = {}) {
   }
 
   try {
-    console.log('🔔 Creating notification:', { title, options })
+    // Use Service Worker for system notifications (works on mobile)
+    if ('serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.ready
+      
+      // Send to service worker - this creates SYSTEM notifications on mobile
+      registration.active?.postMessage({
+        type: 'SHOW_NOTIFICATION',
+        title,
+        options: {
+          body: options.body || '',
+          icon: options.icon || '/favicon.svg',
+          badge: options.badge || '/favicon.svg',
+          tag: options.tag || `notification-${Date.now()}`,
+          requireInteraction: options.requireInteraction || false,
+          data: options.data || { url: '/' },
+          vibrate: options.vibrate || [200, 100, 200],
+          ...options,
+        }
+      })
+
+      console.log('✅ System notification sent via Service Worker')
+      console.log('📍 Check your Android notification panel')
+      
+      // Also show in-app notification as fallback
+      if (inAppNotificationCallback) {
+        try {
+          inAppNotificationCallback(title, options.body || '')
+        } catch (error) {
+          console.warn('Failed to show in-app notification:', error)
+        }
+      }
+      
+      return { success: true }
+    }
+
+    // Fallback to browser Notification API (desktop)
+    console.log('🔔 Creating browser notification:', { title, options })
     
     const notification = new Notification(title, {
       icon: '/favicon.svg',
@@ -59,19 +96,8 @@ export function sendNotification(title, options = {}) {
     })
 
     console.log('✅ Notification created successfully:', notification)
-    console.log('📍 Check your browser notification area (top-right corner or system tray)')
 
-    // Also show in-app notification as fallback (in case Windows blocks browser notifications)
-    if (inAppNotificationCallback) {
-      try {
-        inAppNotificationCallback(title, options.body || '')
-        console.log('✅ In-app notification also shown as fallback')
-      } catch (error) {
-        console.warn('Failed to show in-app notification:', error)
-      }
-    }
-
-    // Add event listeners to track notification behavior
+    // Add event listeners
     notification.onclick = () => {
       console.log('👆 Notification clicked')
       window.focus()
@@ -96,7 +122,6 @@ export function sendNotification(title, options = {}) {
         notification.close()
       }, 5000)
     } else {
-      // Keep open longer for important notifications (10 seconds)
       setTimeout(() => {
         notification.close()
       }, 10000)
@@ -105,13 +130,8 @@ export function sendNotification(title, options = {}) {
     return notification
   } catch (error) {
     console.error('❌ Error creating notification:', error)
-    console.error('Error details:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    })
     
-    // Show in-app notification even if browser notification fails
+    // Show in-app notification as fallback
     if (inAppNotificationCallback) {
       try {
         inAppNotificationCallback(title, options.body || '')
@@ -211,12 +231,13 @@ export async function checkTomorrowReminders(userDisplayName) {
     const noteText = duties.note ? `\n\nNote: ${duties.note}` : ''
     
     console.log('Sending tomorrow reminder:', dateStr, assignmentsText)
-    sendNotification(
+    await sendNotification(
       `📅 Tomorrow's Schedule (${dayName})`,
       {
         body: `${dateStr}\n\n${assignmentsText}${noteText}`,
         tag: `duty-reminder-${format(tomorrow, 'yyyy-MM-dd')}`,
         requireInteraction: false,
+        data: { url: '/schedule' },
       }
     )
   } catch (error) {
@@ -247,12 +268,13 @@ export async function checkTodayReminders(userDisplayName) {
     const noteText = duties.note ? `\n\nNote: ${duties.note}` : ''
     
     console.log('Sending today reminder:', dateStr, assignmentsText)
-    sendNotification(
+    await sendNotification(
       `⚡ Today's Schedule (${dayName})`,
       {
         body: `${dateStr}\n\n${assignmentsText}${noteText}`,
         tag: `duty-today-${format(today, 'yyyy-MM-dd')}`,
         requireInteraction: true, // Keep open longer for today's duties
+        data: { url: '/schedule' },
       }
     )
   } catch (error) {

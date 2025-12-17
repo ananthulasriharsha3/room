@@ -4,7 +4,8 @@ import { motion } from 'framer-motion'
 import { listExpenses, closeMonth } from '../utils/expenses'
 import { listShoppingItems } from '../utils/shopping'
 import { listGroceryPurchases } from '../utils/grocery'
-import { areNotificationsEnabled, requestNotificationPermission, sendNotification, getDutiesForDate, formatAssignments } from '../utils/notifications'
+import { areNotificationsEnabled, requestNotificationPermission, getDutiesForDate, formatAssignments } from '../utils/notifications'
+import { sendSystemNotification } from '../utils/pushNotification'
 import { format, startOfMonth, parseISO } from 'date-fns'
 import { FaDollarSign, FaShoppingCart } from 'react-icons/fa'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
@@ -39,16 +40,21 @@ export default function Dashboard() {
     const enabled = await requestNotificationPermission()
     setNotificationEnabled(enabled)
     if (enabled) {
-      alert('Notifications enabled! You will receive reminders for your duties.')
+      console.log('✅ Notifications enabled! You will receive reminders for your duties.')
+      // Show a system notification to confirm
+      await sendSystemNotification('Notifications Enabled', {
+        body: 'You will receive reminders for your duties.',
+        tag: 'notification-enabled',
+      })
     } else {
-      alert('Please enable notifications in your browser settings to receive duty reminders.')
+      console.log('❌ Please enable notifications in your browser settings to receive duty reminders.')
     }
   }
 
   const handleTestNotification = async () => {
     // Check permission first
     if (!('Notification' in window)) {
-      alert('Your browser does not support notifications.')
+      console.error('Your browser does not support notifications.')
       return
     }
 
@@ -56,67 +62,68 @@ export default function Dashboard() {
     console.log('🔍 Current notification permission:', permission)
 
     if (permission === 'denied') {
-      alert('Notifications are blocked. Please enable them in your browser settings:\n\nChrome: Settings → Privacy → Site Settings → Notifications\n\nThen refresh the page.')
+      console.warn('Notifications are blocked. Please enable them in your browser settings.')
       return
     }
 
     if (permission !== 'granted') {
       const result = await requestNotificationPermission()
       if (!result) {
-        alert('Please allow notifications to test them.')
+        console.warn('Please allow notifications to test them.')
         return
       }
       setNotificationEnabled(true)
     }
 
     try {
-      console.log('🧪 Testing notification...')
+      console.log('🧪 Testing system notification...')
       
       // Try to get today's duties for a real test
       const today = new Date()
       const duties = await getDutiesForDate(today)
       
       if (duties && duties.assignments && Object.keys(duties.assignments).length > 0) {
-        // Send real schedule notification
+        // Send real schedule notification as SYSTEM notification
         const dateStr = format(today, 'EEE d MMM')
         const dayName = duties.dayName
         const assignmentsText = formatAssignments(duties.assignments)
         const noteText = duties.note ? `\n\nNote: ${duties.note}` : ''
         
-        const notification = sendNotification(
+        const success = await sendSystemNotification(
           `⚡ Today's Schedule (${dayName})`,
           {
             body: `${dateStr}\n\n${assignmentsText}${noteText}`,
             tag: `test-notification-${Date.now()}`,
             requireInteraction: true,
+            data: { url: '/' },
           }
         )
 
-        if (!notification) {
-          alert('Failed to create notification. Check console for details.')
+        if (success) {
+          console.log('✅ System notification sent! Check your Android notification panel.')
         } else {
-          console.log('✅ Test notification sent! Check your browser notification area (top-right corner or system tray).')
+          console.error('❌ Failed to send system notification. Check console for details.')
         }
       } else {
         // Send a test notification if no schedule
-        const notification = sendNotification(
+        const success = await sendSystemNotification(
           '🔔 Test Notification',
           {
             body: 'Push notifications are working! You will receive reminders for your duties.',
             tag: `test-notification-${Date.now()}`,
             requireInteraction: true,
+            data: { url: '/' },
           }
         )
 
-        if (!notification) {
-          alert('Failed to create notification. Check console for details.')
+        if (success) {
+          console.log('✅ System notification sent! Check your Android notification panel.')
         } else {
-          console.log('✅ Test notification sent! Check your browser notification area (top-right corner or system tray).')
+          console.error('❌ Failed to send system notification. Check console for details.')
         }
       }
     } catch (error) {
       console.error('Error testing notification:', error)
-      alert('Error sending test notification. Check console for details.')
     }
   }
 
@@ -133,7 +140,7 @@ export default function Dashboard() {
       await fetchDashboardData()
     } catch (error) {
       console.error('Error closing month:', error)
-      alert(error.message || 'Failed to close month. Please try again.')
+      console.error('Failed to close month:', error.message || 'Please try again.')
     } finally {
       setClosingMonth(false)
     }

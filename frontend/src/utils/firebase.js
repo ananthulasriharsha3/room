@@ -17,30 +17,58 @@ const app = initializeApp(firebaseConfig)
 
 // Register service worker and send config
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  navigator.serviceWorker.ready.then((registration) => {
-    // Send Firebase config to service worker
-    if (registration.active) {
-      registration.active.postMessage({
-        type: 'FIREBASE_CONFIG',
-        config: firebaseConfig
-      })
-    } else if (registration.installing) {
-      registration.installing.addEventListener('statechange', function() {
-        if (this.state === 'activated' && registration.active) {
+  // Register service worker first
+  navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+    scope: '/'
+  })
+    .then((registration) => {
+      console.log('✅ Service Worker registered:', registration.scope)
+      
+      // Wait for service worker to be ready
+      return navigator.serviceWorker.ready
+    })
+    .then((registration) => {
+      // Send Firebase config to service worker
+      const sendConfig = () => {
+        if (registration.active) {
           registration.active.postMessage({
             type: 'FIREBASE_CONFIG',
             config: firebaseConfig
           })
+          console.log('✅ Firebase config sent to service worker')
+        } else if (registration.installing) {
+          registration.installing.addEventListener('statechange', function() {
+            if (this.state === 'activated' && registration.active) {
+              registration.active.postMessage({
+                type: 'FIREBASE_CONFIG',
+                config: firebaseConfig
+              })
+              console.log('✅ Firebase config sent to service worker (after activation)')
+            }
+          })
+        } else if (registration.waiting) {
+          registration.waiting.postMessage({
+            type: 'FIREBASE_CONFIG',
+            config: firebaseConfig
+          })
+          console.log('✅ Firebase config sent to waiting service worker')
+        }
+      }
+      
+      // Try to send config immediately
+      sendConfig()
+      
+      // Also listen for service worker updates
+      registration.addEventListener('updatefound', () => {
+        const newWorker = registration.installing
+        if (newWorker) {
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'activated' && registration.active) {
+              sendConfig()
+            }
+          })
         }
       })
-    }
-  }).catch((error) => {
-    console.error('Service Worker ready failed:', error)
-  })
-
-  navigator.serviceWorker.register('/firebase-messaging-sw.js')
-    .then((registration) => {
-      console.log('✅ Service Worker registered:', registration.scope)
     })
     .catch((error) => {
       console.error('Service Worker registration failed:', error)
@@ -67,6 +95,11 @@ export async function requestFCMToken() {
   }
 
   try {
+    // Ensure service worker is ready
+    if ('serviceWorker' in navigator) {
+      await navigator.serviceWorker.ready
+    }
+
     // VAPID key from environment or Firebase Console
     const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY || ''
     
@@ -75,7 +108,19 @@ export async function requestFCMToken() {
       return null
     }
 
-    const currentToken = await getToken(messaging, { vapidKey })
+    // Request notification permission first (required for FCM token)
+    if (Notification.permission !== 'granted') {
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        console.warn('Notification permission not granted')
+        return null
+      }
+    }
+
+    const currentToken = await getToken(messaging, { 
+      vapidKey,
+      serviceWorkerRegistration: await navigator.serviceWorker.ready
+    })
     
     if (currentToken) {
       console.log('✅ FCM Token:', currentToken)

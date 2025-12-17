@@ -1,0 +1,24 @@
+{
+  "name": "Room Duty Scheduler",
+  "short_name": "Room Duty",
+  "description": "Manage room duties, expenses, and schedules",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#E50914",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "screenshots": [],
+  "shortcuts": [],
+  "share_target": {},
+  "gcm_sender_id": "32736425908"
+}
+
