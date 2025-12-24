@@ -1,14 +1,21 @@
 // Firebase Cloud Messaging notifications for duty reminders
-import { requestFCMToken, onForegroundMessage, sendFCMNotification } from './firebase'
+import { requestFCMToken, onForegroundMessage } from './firebase'
 import { getDutiesForDate, formatAssignments } from './notifications'
+import { sendSystemNotification } from './pushNotification'
 import { format, addDays } from 'date-fns'
 import { supabase, TABLES } from './supabase'
 
+// Store FCM token in database (optional - notifications work without it)
+let tableMissing = false // Cache table missing status to avoid repeated 404s
+
 // Store FCM token in database
 export async function saveFCMToken(userId, token) {
+  // Skip if we know table doesn't exist (to avoid repeated 404s)
+  if (tableMissing) {
+    return false
+  }
+
   try {
-    // You can store tokens in a separate table or in user preferences
-    // For now, we'll store it in a user_tokens table (create this if needed)
     const { error } = await supabase
       .from('user_fcm_tokens')
       .upsert({
@@ -20,10 +27,19 @@ export async function saveFCMToken(userId, token) {
       })
 
     if (error) {
+      // If table doesn't exist, cache this to avoid future attempts
+      if (error.code === 'PGRST205' || error.message?.includes('Could not find the table')) {
+        tableMissing = true
+        console.log('ℹ️ user_fcm_tokens table not found - skipping token storage (notifications work via Service Worker)')
+        console.log('💡 To create the table: Run frontend/migrations/create_user_fcm_tokens_table.sql in Supabase SQL editor')
+        return false
+      }
       console.error('Error saving FCM token:', error)
       return false
     }
 
+    // Success - table exists
+    tableMissing = false
     return true
   } catch (error) {
     console.error('Error saving FCM token:', error)
@@ -33,6 +49,11 @@ export async function saveFCMToken(userId, token) {
 
 // Get FCM token for a user
 export async function getFCMToken(userId) {
+  // Skip if we know table doesn't exist
+  if (tableMissing) {
+    return null
+  }
+
   try {
     const { data, error } = await supabase
       .from('user_fcm_tokens')
@@ -40,13 +61,20 @@ export async function getFCMToken(userId) {
       .eq('user_id', userId)
       .single()
 
-    if (error || !data) {
+    if (error) {
+      // If table doesn't exist, cache this to avoid future attempts
+      if (error.code === 'PGRST205' || error.message?.includes('Could not find the table')) {
+        tableMissing = true
+      }
+      return null
+    }
+
+    if (!data) {
       return null
     }
 
     return data.fcm_token
   } catch (error) {
-    console.error('Error getting FCM token:', error)
     return null
   }
 }
@@ -57,7 +85,13 @@ export async function initializeFCM(userId) {
     const token = await requestFCMToken()
     
     if (token) {
-      await saveFCMToken(userId, token)
+      // Try to save token, but don't fail if table doesn't exist (notifications work without it)
+      try {
+        await saveFCMToken(userId, token)
+      } catch (saveError) {
+        // Token saving is optional - notifications work via Service Worker without stored tokens
+        console.log('FCM token obtained, but not saved to database (table may not exist - this is OK)')
+      }
       
       // Set up foreground message listener
       onForegroundMessage((payload) => {
@@ -78,11 +112,12 @@ export async function initializeFCM(userId) {
 // Send duty reminder notification via FCM
 export async function sendDutyNotification(userId, date, duties) {
   try {
+    // Note: We use sendSystemNotification which works via Service Worker
+    // FCM token is stored but not strictly required for browser notifications
     const token = await getFCMToken(userId)
     
     if (!token) {
-      console.log('No FCM token for user:', userId)
-      return false
+      console.log('No FCM token for user:', userId, '- will still try to send notification via Service Worker')
     }
 
     const dateStr = format(date, 'EEE d MMM')
@@ -97,15 +132,26 @@ export async function sendDutyNotification(userId, date, duties) {
     
     const body = `${dateStr}\n\n${assignmentsText}${noteText}`
     
-    // In production, this would be sent from your backend
-    // For now, we'll use the browser notification as fallback
-    await sendFCMNotification(token, title, body, {
-      date: format(date, 'yyyy-MM-dd'),
+    // Send notification via Service Worker (same as test notifications)
+    const success = await sendSystemNotification(title, {
+      body: body,
+      icon: '/favicon.svg',
+      badge: '/favicon.svg',
       tag: `duty-${isToday ? 'today' : 'tomorrow'}-${format(date, 'yyyy-MM-dd')}`,
       requireInteraction: isToday,
+      data: { 
+        url: '/schedule',
+        date: format(date, 'yyyy-MM-dd')
+      },
     })
     
-    return true
+    if (success) {
+      console.log('✅ Duty notification sent successfully')
+    } else {
+      console.error('❌ Failed to send duty notification')
+    }
+    
+    return success
   } catch (error) {
     console.error('Error sending duty notification:', error)
     return false

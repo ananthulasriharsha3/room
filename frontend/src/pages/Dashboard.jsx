@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [closingMonth, setClosingMonth] = useState(false)
   const [notificationEnabled, setNotificationEnabled] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
     fetchDashboardData()
@@ -34,6 +35,16 @@ export default function Dashboard() {
     }, 10000) // 10 second timeout
     
     return () => clearTimeout(timeout)
+  }, [])
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
   const handleEnableNotifications = async () => {
@@ -471,20 +482,26 @@ export default function Dashboard() {
         </div>
         {monthlyData.length > 0 ? (
           <div className="flex flex-col lg:flex-row items-center justify-center gap-4 sm:gap-6 lg:gap-8">
-            <div className="w-full lg:w-1/2 max-w-md overflow-visible">
-              <ResponsiveContainer width="100%" height={300} className="sm:h-[350px] lg:h-[400px]">
-                <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+            <div className="w-full lg:w-1/2 max-w-md overflow-visible px-0 sm:px-0 -mx-8 sm:mx-0" style={{ overflow: 'visible' }}>
+              <ResponsiveContainer width="100%" height={isMobile ? 340 : 300} className="sm:h-[350px] lg:h-[400px]" style={{ overflow: 'visible' }}>
+                <PieChart 
+                  margin={isMobile 
+                    ? { top: 30, right: 100, bottom: 30, left: 140 } 
+                    : { top: 20, right: 40, bottom: 20, left: 40 }
+                  }
+                >
                   <Pie
                     data={monthlyData}
                     cx="50%"
                     cy="50%"
                     labelLine={true}
                     label={({ name, percent }) => {
-                      // Show label for all segments, but format it nicely
-                      return `${name}\n${(percent * 100).toFixed(1)}%`
+                      // Show only first name (first word) and percentage
+                      const firstName = name.split(' ')[0]
+                      return `${firstName}\n${(percent * 100).toFixed(1)}%`
                     }}
-                    outerRadius={100}
-                    innerRadius={30}
+                    outerRadius={isMobile ? 65 : 100}
+                    innerRadius={isMobile ? 20 : 30}
                     fill="#8884d8"
                     dataKey="value"
                     paddingAngle={0}
@@ -496,12 +513,49 @@ export default function Dashboard() {
                   <Tooltip
                     formatter={(value) => `₹${value.toFixed(2)}`}
                   />
-                  <Legend 
-                    wrapperStyle={{ paddingTop: '20px' }}
-                    formatter={(value) => <span style={{ color: 'inherit' }}>{value}</span>}
-                  />
+                  {!isMobile && (
+                    <Legend 
+                      wrapperStyle={{ 
+                        paddingTop: '20px',
+                        overflow: 'visible',
+                        width: '100%'
+                      }}
+                      formatter={(value) => (
+                        <span 
+                          style={{ 
+                            color: 'inherit',
+                            fontSize: '14px',
+                            wordBreak: 'break-word',
+                            overflowWrap: 'break-word'
+                          }}
+                        >
+                          {value}
+                        </span>
+                      )}
+                      iconType="circle"
+                      layout="vertical"
+                      verticalAlign="middle"
+                      align="right"
+                    />
+                  )}
                 </PieChart>
               </ResponsiveContainer>
+              {/* Custom legend for mobile to ensure names don't get cut off */}
+              {isMobile && monthlyData.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-4 px-2">
+                  {monthlyData.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2 min-w-0">
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="text-xs sm:text-sm dark:text-dark-text light:text-light-text break-words">
+                        {item.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="w-full lg:w-1/2 space-y-3 sm:space-y-4">
               {monthlyData.map((item, index) => (
@@ -510,12 +564,12 @@ export default function Dashboard() {
                   className="flex items-center justify-between p-3 sm:p-4 border rounded-lg sm:rounded-xl backdrop-blur-sm"
                   style={{ background: 'rgba(0, 0, 0, 0.2)', borderColor: 'rgba(255, 255, 255, 0.2)' }}
                 >
-                  <div className="flex items-center space-x-2 sm:space-x-3">
+                  <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
                     <div
                       className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 rounded-full shadow-lg ring-2 ring-white/20 flex-shrink-0"
                       style={{ backgroundColor: item.color }}
                     />
-                    <span className="font-semibold text-sm sm:text-base lg:text-lg dark:text-dark-text light:text-light-text">
+                    <span className="font-semibold text-sm sm:text-base lg:text-lg dark:text-dark-text light:text-light-text break-words">
                       {item.name}
                     </span>
                   </div>

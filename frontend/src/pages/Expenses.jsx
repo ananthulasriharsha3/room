@@ -129,8 +129,8 @@ export default function Expenses() {
   }
 
   const handleEdit = (expense) => {
-    if (expense.person.toLowerCase() !== loggedInPerson.toLowerCase()) {
-      alert('You can only edit your own expenses')
+    if (!canEdit) {
+      alert('You need access to edit expenses. Please contact an admin.')
       return
     }
     setEditingExpense(expense)
@@ -142,8 +142,8 @@ export default function Expenses() {
   }
 
   const handleDelete = async (id, person) => {
-    if (person.toLowerCase() !== loggedInPerson.toLowerCase()) {
-      alert('You can only delete your own expenses')
+    if (!canEdit) {
+      alert('You need access to delete expenses. Please contact an admin.')
       return
     }
     
@@ -554,7 +554,7 @@ export default function Expenses() {
                             {format(new Date(expense.timestamp), 'MMM dd, yyyy HH:mm')}
                           </p>
                         </div>
-                        {isLoggedInPerson && (
+                        {canEdit && (
                           <div className="flex gap-1 sm:gap-2 ml-2 flex-shrink-0">
                             <motion.button
                               onClick={() => handleEdit(expense)}

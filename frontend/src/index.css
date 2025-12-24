@@ -213,6 +213,15 @@ input[type="password"]::placeholder {
   stroke-width: 1 !important;
 }
 
+/* Ensure pie chart labels are visible on mobile */
+.recharts-wrapper {
+  overflow: visible !important;
+}
+
+.recharts-surface {
+  overflow: visible !important;
+}
+
 /* ============================================
    STRANGER THINGS UTILITY CLASSES
    ============================================ */

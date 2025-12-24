@@ -15,16 +15,17 @@ export async function getDayNote(dateStr) {
     .from(TABLES.DAY_NOTES)
     .select('date, note, created_by')
     .eq('date', dateStr)
-    .limit(1)
-    .single()
+    .maybeSingle()
 
   if (error) {
-    if (error.code === 'PGRST116') {
+    // If it's a "not found" error, that's fine - return null
+    if (error.code === 'PGRST116' || error.code === 'PGRST202') {
       throw new Error('Day note not found for this date.')
     }
     throw new Error(`Failed to fetch day note: ${error.message}`)
   }
 
+  // If no data, note doesn't exist
   if (!data) {
     throw new Error('Day note not found for this date.')
   }
