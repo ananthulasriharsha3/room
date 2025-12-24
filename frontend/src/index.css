@@ -213,6 +213,17 @@ input[type="password"]::placeholder {
   stroke-width: 1 !important;
 }
 
+/* Responsive chart labels */
+@media (max-width: 768px) {
+  .recharts-pie-label-text {
+    font-size: 10px !important;
+  }
+  
+  .recharts-pie-label-line {
+    stroke-width: 0.5 !important;
+  }
+}
+
 /* Ensure pie chart labels are visible on mobile */
 .recharts-wrapper {
   overflow: visible !important;

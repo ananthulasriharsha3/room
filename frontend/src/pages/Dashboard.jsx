@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [closingMonth, setClosingMonth] = useState(false)
   const [notificationEnabled, setNotificationEnabled] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [viewportWidth, setViewportWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024)
 
   useEffect(() => {
     fetchDashboardData()
@@ -37,14 +38,16 @@ export default function Dashboard() {
     return () => clearTimeout(timeout)
   }, [])
 
-  // Detect mobile viewport
+  // Detect viewport size for responsive design
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768)
+    const checkViewport = () => {
+      const width = window.innerWidth
+      setViewportWidth(width)
+      setIsMobile(width < 768)
     }
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
+    checkViewport()
+    window.addEventListener('resize', checkViewport)
+    return () => window.removeEventListener('resize', checkViewport)
   }, [])
 
   const handleEnableNotifications = async () => {
@@ -461,13 +464,13 @@ export default function Dashboard() {
         </div>
 
       {/* Monthly Expenditure Pie Chart */}
-        <AnimatedCard className="p-4 sm:p-6">
-        <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-          <div className="flex-1">
-            <h2 className="text-lg sm:text-xl lg:text-2xl font-bold dark:text-dark-text light:text-light-text mb-1 sm:mb-2">
+        <AnimatedCard className="p-3 sm:p-4 md:p-6">
+        <div className="mb-3 sm:mb-4 md:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3 md:gap-4">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold dark:text-dark-text light:text-light-text mb-1 sm:mb-2 break-words">
               Monthly Expenditure - {format(new Date(), 'MMMM yyyy')}
             </h2>
-            <p className="text-xs sm:text-sm dark:text-dark-text-secondary light:text-light-text-secondary">
+            <p className="text-xs sm:text-sm dark:text-dark-text-secondary light:text-light-text-secondary break-words">
               Breakdown of expenses and groceries for this month
             </p>
           </div>
@@ -475,33 +478,48 @@ export default function Dashboard() {
             onClick={handleCloseMonth}
             disabled={closingMonth}
             variant="danger"
-            className="w-full sm:w-auto px-3 sm:px-4 py-2 text-sm sm:text-base"
+            className="w-full sm:w-auto px-3 sm:px-4 py-2 text-xs sm:text-sm md:text-base flex-shrink-0"
           >
             {closingMonth ? 'Closing...' : 'Close Month'}
           </AnimatedButton>
         </div>
         {monthlyData.length > 0 ? (
-          <div className="flex flex-col lg:flex-row items-center justify-center gap-4 sm:gap-6 lg:gap-8">
-            <div className="w-full lg:w-1/2 max-w-md overflow-visible px-0 sm:px-0 -mx-8 sm:mx-0" style={{ overflow: 'visible' }}>
-              <ResponsiveContainer width="100%" height={isMobile ? 340 : 300} className="sm:h-[350px] lg:h-[400px]" style={{ overflow: 'visible' }}>
+          <div className="flex flex-col lg:flex-row items-center justify-center gap-3 sm:gap-4 md:gap-6 lg:gap-8">
+            <div className="w-full lg:w-1/2 max-w-full sm:max-w-md overflow-visible">
+              <ResponsiveContainer width="100%" height={isMobile ? 280 : viewportWidth < 1024 ? 320 : 400} style={{ overflow: 'visible' }}>
                 <PieChart 
-                  margin={isMobile 
-                    ? { top: 30, right: 100, bottom: 30, left: 140 } 
-                    : { top: 20, right: 40, bottom: 20, left: 40 }
+                  margin={
+                    isMobile 
+                      ? { top: 20, right: 60, bottom: 20, left: 80 } 
+                      : viewportWidth < 1024
+                      ? { top: 20, right: 60, bottom: 20, left: 80 }
+                      : { top: 20, right: 40, bottom: 20, left: 40 }
                   }
                 >
                   <Pie
                     data={monthlyData}
                     cx="50%"
                     cy="50%"
-                    labelLine={true}
+                    labelLine={!isMobile}
                     label={({ name, percent }) => {
                       // Show only first name (first word) and percentage
                       const firstName = name.split(' ')[0]
                       return `${firstName}\n${(percent * 100).toFixed(1)}%`
                     }}
-                    outerRadius={isMobile ? 65 : 100}
-                    innerRadius={isMobile ? 20 : 30}
+                    outerRadius={
+                      isMobile 
+                        ? Math.min(60, Math.max(50, (viewportWidth - 180) / 6))
+                        : viewportWidth < 1024 
+                        ? 80 
+                        : 100
+                    }
+                    innerRadius={
+                      isMobile 
+                        ? Math.min(18, Math.max(15, (viewportWidth - 180) / 20))
+                        : viewportWidth < 1024 
+                        ? 25 
+                        : 30
+                    }
                     fill="#8884d8"
                     dataKey="value"
                     paddingAngle={0}
@@ -524,9 +542,10 @@ export default function Dashboard() {
                         <span 
                           style={{ 
                             color: 'inherit',
-                            fontSize: '14px',
+                            fontSize: viewportWidth < 1024 ? '12px' : '14px',
                             wordBreak: 'break-word',
-                            overflowWrap: 'break-word'
+                            overflowWrap: 'break-word',
+                            whiteSpace: 'normal'
                           }}
                         >
                           {value}
@@ -542,14 +561,14 @@ export default function Dashboard() {
               </ResponsiveContainer>
               {/* Custom legend for mobile to ensure names don't get cut off */}
               {isMobile && monthlyData.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-4 px-2">
+                <div className="flex flex-wrap justify-center gap-x-3 sm:gap-x-4 gap-y-2 mt-3 sm:mt-4 px-2">
                   {monthlyData.map((item, index) => (
-                    <div key={index} className="flex items-center gap-2 min-w-0">
+                    <div key={index} className="flex items-center gap-2 min-w-0 max-w-full">
                       <div
                         className="w-3 h-3 rounded-full flex-shrink-0"
                         style={{ backgroundColor: item.color }}
                       />
-                      <span className="text-xs sm:text-sm dark:text-dark-text light:text-light-text break-words">
+                      <span className="text-xs sm:text-sm dark:text-dark-text light:text-light-text break-words max-w-[120px] sm:max-w-none">
                         {item.name}
                       </span>
                     </div>
